@@ -1,0 +1,218 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{xepersian}
+\settextfont{Amiri}
+\setlatintextfont{Times New Roman}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{booktabs}
+
+\title{تکلیف دوم درس شبکه های عصبی}
+\author{وحید ملکی، پوریا دادستان}
+\date{17 آذر 1404}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section{مقدمه و تعریف مسئله}
+	در این بخش از تمرین، یک معماری نوین برای شبکه عصبی پیشنهاد شده است که همزمان سه ویژگی پیشرفته را داراست:
+	\begin{enumerate}
+		\item \textbf{انعطاف‌پذیری (\lr{Flexibility}):} استفاده از توابع فعال‌ساز ترکیبی با پارامترهای یادگیرنده.
+		\item \textbf{رفتار عاطفی (\lr{Emotional Behavior}):} استفاده از تاریخچه خطا برای تعدیل فرآیند به‌روزرسانی وزن‌ها.
+		\item \textbf{آموزش پیشرفته:} مقایسه الگوریتم \lr{Adam} (مرتبه اول) و \lr{Levenberg-Marquardt} (مرتبه دوم).
+	\end{enumerate}
+	هدف نهایی، بررسی کارایی این ساختار بر روی دو دسته مسئله رگرسیون (سری زمانی) و طبقه‌بندی (داده‌های آماری) است.
+	
+	\section{مدل ریاضی و روابط حاکم}
+	
+	\subsection{توابع فعال‌ساز منعطف ($F_1$ و $F_2$)}
+	برخلاف شبکه‌های کلاسیک، در این مدل هر نورون دارای تابع فعال‌سازی است که ترکیبی خطی از چهار تابع پایه می‌باشد. پارامترهای شکل‌دهنده و ضرایب ترکیب، همگی در حین آموزش بهینه می‌شوند.
+	
+	\textbf{تابع فعال‌ساز نوع اول ($F_1$):} کامل‌ترین فرم (شامل بخش خطی):
+	\begin{equation}
+		F_1(x) = \alpha \cdot \sigma(\theta_1 x) + \beta \cdot \tanh(\theta_2 x) + \gamma \cdot \text{ReLU}(\theta_3 x) + \delta \cdot (\theta_4 x)
+	\end{equation}
+	
+	\textbf{تابع فعال‌ساز نوع دوم ($F_2$):} فرم فشرده (بدون بخش خطی):
+	\begin{equation}
+		F_2(x) = \alpha \cdot \sigma(\theta_1 x) + \beta \cdot \tanh(\theta_2 x) + \gamma \cdot \text{ReLU}(\theta_3 x)
+	\end{equation}
+	
+	در اینجا $\sigma(z) = \frac{1}{1+e^{-z}}$ است. مجموعه پارامترهای آموزش‌پذیر برای هر نورون عبارتند از: $\Omega = \{\alpha, \beta, \gamma, \delta, \theta_1, \dots, \theta_4\}$.
+	
+	\subsection{تزریق منطق عاطفی (\lr{Emotional Logic})}
+	در شبکه‌های عصبی استاندارد، هدف کمینه‌سازی خطای لحظه‌ای $e(k)$ است. اما در شبکه عاطفی پیشنهادی، یک سیگنال عاطفی $r(k)$ تعریف می‌شود که به تغییرات خطا نیز حساس است:
+	\begin{equation}
+		e(k) = y_{target}(k) - y_{pred}(k)
+	\end{equation}
+	\begin{equation}
+		\Delta e(k) = e(k) - e(k-1)
+	\end{equation}
+	\begin{equation}
+		r(k) = k_1 e(k) + k_2 \Delta e(k)
+	\end{equation}
+	ضرایب $k_1$ و $k_2$ میزان اهمیت خطای لحظه‌ای و روند تغییرات خطا را تعیین می‌کنند (در این پیاده‌سازی $k_1=0.7, k_2=0.3$).
+	
+	\subsection{روابط پیشرو (\lr{Forward Propagation})}
+	در این شبکه، محاسبات لایه به لایه انجام می‌شود. فرض کنیم $A^{(l-1)}$ بردار ورودی به لایه $l$ام باشد (که $A^{(0)} = X$ است). خروجی خالص ($net$) و خروجی فعال‌شده ($A$) برای هر نورون $j$ در لایه $l$ به صورت زیر محاسبه می‌شود:
+	
+	\begin{equation}
+		net_j^{(l)} = \sum_{i} w_{ji}^{(l)} A_i^{(l-1)} + b_j^{(l)}
+	\end{equation}
+	
+	سپس تابع فعال‌ساز ترکیبی $F_1$ (یا $F_2$) روی $net$ اعمال می‌شود. رابطه کلی برای کامل‌ترین حالت ($F_1$) عبارت است از:
+	\begin{align}
+		A_j^{(l)} = F(net_j^{(l)}, \Omega_j^{(l)}) &= \alpha_j^{(l)} \sigma(\theta_{1,j}^{(l)} net_j^{(l)}) \nonumber \\
+		&+ \beta_j^{(l)} \tanh(\theta_{2,j}^{(l)} net_j^{(l)}) \nonumber \\
+		&+ \gamma_j^{(l)} \text{ReLU}(\theta_{3,j}^{(l)} net_j^{(l)}) \nonumber \\
+		&+ \delta_j^{(l)} (\theta_{4,j}^{(l)} net_j^{(l)})
+	\end{align}
+	که در آن $\Omega_j^{(l)}$ مجموعه پارامترهای آموزش‌پذیر تابع فعال‌ساز برای نورون $j$ در لایه $l$ است.
+	
+	\subsection{روابط پسرو و اصلاح گرادیان (\lr{Backpropagation})}
+	هدف فرآیند پسرو، محاسبه گرادیان تابع هزینه نسبت به تمامی پارامترهای شبکه ($\Theta = \{W, b, \Omega\}$) جهت استفاده در الگوریتم \lr{LM} یا \lr{Adam} است.
+	
+	\subsubsection{۱. تابع هزینه عاطفی و قاعده زنجیره‌ای اصلاح‌شده}
+	در شبکه‌های عصبی عاطفی، تابع هزینه بر اساس سیگنال عاطفی $r$ تعریف می‌شود، نه صرفاً خطای خام $e$.
+	\begin{equation}
+		E(k) = \frac{1}{2} r(k)^2, \quad r(k) = k_1 e(k) + k_2 [e(k) - e(k-1)]
+	\end{equation}
+	برای محاسبه گرادیان نسبت به یک پارامتر دلخواه $\Theta$، از قاعده زنجیره‌ای استفاده می‌کنیم:
+	\begin{equation}
+		\frac{\partial E}{\partial \Theta} = \frac{\partial E}{\partial r} \cdot \frac{\partial r}{\partial e} \cdot \frac{\partial e}{\partial \Theta} = r(k) \cdot (k_1 + k_2) \cdot \frac{\partial e}{\partial \Theta}
+	\end{equation}
+	از آنجا که $e = y_d - y_{net}$، داریم $\frac{\partial e}{\partial \Theta} = -\frac{\partial y_{net}}{\partial \Theta}$. بنابراین، تمام مشتقات استاندارد شبکه در ضریب **$(k_1 + k_2)$** ضرب می‌شوند تا رفتار عاطفی را مدل‌سازی کنند.
+	
+	\subsubsection{۲. مشتقات پارامترهای انعطاف‌پذیر}
+	برای هر نورون، مشتق خروجی فعال‌ساز ($A$) نسبت به پارامترهای شکل‌دهنده آن ($\Omega$) باید محاسبه شود. این مشتقات ستون‌های ماتریس ژاکوبین را تشکیل می‌دهند.
+	
+	\textbf{الف) مشتق نسبت به ضرایب ترکیب ($\alpha, \beta, \gamma, \delta$):}
+	\begin{align}
+		\frac{\partial A}{\partial \alpha} &= \sigma(\theta_1 net) \\
+		\frac{\partial A}{\partial \beta} &= \tanh(\theta_2 net) \\
+		\frac{\partial A}{\partial \gamma} &= \text{ReLU}(\theta_3 net) \\
+		\frac{\partial A}{\partial \delta} &= \theta_4 net
+	\end{align}
+	
+	\textbf{ب) مشتق نسبت به پارامترهای درونی ($\theta_1, \theta_2, \theta_3, \theta_4$):}
+	در اینجا نیاز به مشتق‌گیری از تابع نسبت به آرگومان داخلی داریم:
+	\begin{align}
+		\frac{\partial A}{\partial \theta_1} &= \alpha \cdot net \cdot \sigma(\theta_1 net)[1 - \sigma(\theta_1 net)] \\
+		\frac{\partial A}{\partial \theta_2} &= \beta \cdot net \cdot [1 - \tanh^2(\theta_2 net)] \\
+		\frac{\partial A}{\partial \theta_3} &= \gamma \cdot net \cdot H(\theta_3 net) \quad (\text{H: Heaviside Step}) \\
+		\frac{\partial A}{\partial \theta_4} &= \delta \cdot net
+	\end{align}
+	
+	\subsubsection{۳. حساسیت لایه‌ها (\lr{Sensitivities})}
+	برای انتشار خطا به لایه‌های عقب‌تر، مشتق خروجی نسبت به ورودی خالص ($net$) محاسبه می‌شود:
+	\begin{equation}
+		F'(net) = \frac{\partial A}{\partial net} = \alpha \theta_1 \sigma' + \beta \theta_2 \text{sech}^2 + \gamma \theta_3 H + \delta \theta_4
+	\end{equation}
+	اگر $\delta^{(l)}$ بردار حساسیت لایه $l$ باشد، رابطه بازگشتی عبارت است از:
+	\begin{equation}
+		\delta^{(l-1)} = (W^{(l)})^T \delta^{(l)} \odot F'(net^{(l-1)})
+	\end{equation}
+	که در نهایت گرادیان وزن‌ها برابر $\frac{\partial E}{\partial W^{(l)}} \propto \delta^{(l)} (A^{(l-1)})^T$ خواهد بود.
+	\section{تحلیل نتایج تجربی}
+	آزمایش‌ها بر روی ۴ دیتاست انجام شد. دو سناریوی معماری بررسی گردید:
+	\begin{itemize}
+		\item \textbf{سناریو \lr{A}:} تمام لایه‌ها از تابع کامل $F_1$.
+		\item \textbf{سناریو \lr{B}:} لایه مخفی $F_2$ و لایه خروجی خطی (\lr{Pureline}).
+	\end{itemize}
+	
+	\subsection{تحلیل مسائل رگرسیون (سری زمانی)}
+	
+	\subsubsection{۱. دیتاست دمای ملبورن (\lr{Melbourne Temperature})}
+	هدف: پیش‌بینی دما بر اساس ۵ روز گذشته.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.85\linewidth]{daily-minimum-temperatures-in-melbourne_(1)_analysis.png}
+		\caption{روند آموزش در دیتاست ملبورن}
+	\end{figure}
+	
+	\textbf{تحلیل نتایج:}
+	\begin{itemize}
+		\item \textbf{دقت نهایی:} الگوریتم \lr{LM} در سناریوی \lr{A} به کمترین خطا ($MSE = 0.0113$) دست یافت. الگوریتم \lr{Adam} نیز بسیار نزدیک عمل کرد ($MSE = 0.0116$).
+		\item \textbf{زمان اجرا:} تفاوت اصلی در زمان اجراست. \lr{Adam} تنها در $0.88$ ثانیه اجرا شد، در حالی که \lr{LM} حدود $21.6$ ثانیه زمان برد.
+		\item \textbf{نتیجه‌گیری:} برای دیتاست‌های ساده و هموار مانند دما، استفاده از \lr{Adam} به صرفه‌تر است زیرا با دقت مشابه، ۲۰ برابر سریع‌تر است.
+	\end{itemize}
+	
+	\subsubsection{۲. دیتاست نظارت تصویری (\lr{Video Surveillance})}
+	هدف: دنبال کردن الگوهای پیکسلی در فریم‌های ویدیو.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.85\linewidth]{Video_surveillance_Dataset_analysis.png}
+		\caption{مقایسه عملکرد \lr{LM} و \lr{Adam} در دیتاست ویدیو}
+	\end{figure}
+	
+	\textbf{تحلیل نتایج (نقطه قوت \lr{LM}):}
+	\begin{itemize}
+		\item \textbf{برتری قاطع \lr{LM}:} در سناریوی \lr{B}، الگوریتم \lr{LM} به خطای خیره‌کننده $0.0004$ رسید. این در حالی است که \lr{Adam} در بهترین حالت خطای $0.0052$ را ثبت کرد (بیش از ۱۰ برابر اختلاف).
+		\item \textbf{تحلیل عاطفی-انعطاف‌پذیر:} ترکیب خروجی خطی (سناریوی B) با بهینه‌ساز مرتبه دوم، به شبکه اجازه داد تا تغییرات ظریف در سیگنال ویدیو را مدل‌سازی کند. مکانیزم عاطفی نیز به پایداری همگرایی در این سطح خطای پایین کمک کرده است.
+	\end{itemize}
+	
+	\subsection{تحلیل مسائل طبقه‌بندی}
+	
+	\subsubsection{۳. دیتاست دانه‌ها (\lr{Seeds})}
+	هدف: تشخیص نوع گندم (۳ کلاس).
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.85\linewidth]{classification-seeds_analysis.png}
+		\caption{دقت دسته‌بندی در دیتاست \lr{Seeds}}
+	\end{figure}
+	
+	\textbf{تحلیل:}
+	\begin{itemize}
+		\item بهترین دقت توسط \lr{LM} در سناریوی \lr{A} بدست آمد ($93.65\%$).
+		\item الگوریتم \lr{Adam} در هر دو سناریو روی عدد $92.06\%$ ثابت ماند. این نشان می‌دهد \lr{LM} توانسته است مرزهای تصمیم‌گیری دقیق‌تری را با تنظیم پارامترهای انعطاف‌پذیر پیدا کند.
+	\end{itemize}
+	
+	\subsubsection{۴. دیتاست شیشه (\lr{Glass})}
+	هدف: تشخیص نوع شیشه (دیتاست دشوار و نامتوازن).
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.85\linewidth]{classification-glass_analysis.png}
+		\caption{تاثیر سناریوی \lr{B} در بهبود دقت دیتاست \lr{Glass}}
+	\end{figure}
+	
+	\textbf{تحلیل مهم:}
+	\begin{itemize}
+		\item \textbf{شکست سناریوی \lr{A}:} سناریوی \lr{A} با الگوریتم \lr{LM} تنها به دقت $63.08\%$ رسید. دلیل این امر احتمالاً \lr{Overfitting} یا گیر افتادن در بهینه محلی به دلیل پیچیدگی بیش از حد توابع فعال‌ساز در تمامی لایه‌هاست.
+		\item \textbf{پیروزی سناریوی \lr{B}:} با ساده‌سازی لایه خروجی به \lr{Pureline} (سناریوی B)، دقت \lr{LM} به طور چشمگیری افزایش یافت و به $75.38\%$ رسید که بهترین نتیجه بین تمام مدل‌هاست. این نشان می‌دهد برای داده‌های نویزی یا نامتوازن، ترکیب لایه مخفی منعطف با خروجی خطی، تعمیم‌پذیری بهتری دارد.
+	\end{itemize}
+	
+	\section{نتیجه‌گیری نهایی}
+	
+	جدول زیر خلاصه بهترین نتایج بدست آمده در این آزمایش را نشان می‌دهد:
+	
+	\begin{table}[H]
+		\centering
+		\caption{خلاصه عملکرد نهایی مدل پیشنهادی}
+		\label{tab:summary}
+		\begin{tabular}{lcccc}
+			\toprule
+			\textbf{Dataset} & \textbf{Best Optimizer} & \textbf{Best Scenario} & \textbf{Metric} & \textbf{Score} \\
+			\midrule
+			Melbourne (Reg) & LM & A & MSE & $0.0113$ \\
+			Video (Reg) & LM & B & MSE & \textbf{$0.0004$} \\
+			Seeds (Cls) & LM & A & Accuracy & $93.65\%$ \\
+			Glass (Cls) & LM & B & Accuracy & \textbf{$75.38$\%} \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	\textbf{جمع‌بندی:} پیاده‌سازی شبکه عاطفی-انعطاف‌پذیر نشان داد که استفاده از سیگنال عاطفی به همراه توابع فعال‌ساز ترکیبی، قدرت یادگیری شبکه را افزایش می‌دهد. اگرچه الگوریتم \lr{Adam} سریع‌تر است، اما الگوریتم \lr{LM} (به خصوص در سناریوی B) برای دستیابی به دقت‌های بسیار بالا و خطای نزدیک به صفر در مسائل رگرسیون پیچیده، بی‌رقیب است.
+	
+\end{document}

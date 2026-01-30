@@ -1,0 +1,22 @@
+\contentsline {section}{\numberline {1}مقدمه}{2}{section.1}%
+\contentsline {section}{\numberline {2}شرح پیاده‌سازی و تنظیمات کلی}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}ساختار کد و الگوریتم}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}تنظیمات پارامترها}{2}{subsection.2.2}%
+\contentsline {section}{\numberline {3}الف) شبکه عصبی معمولی با سه لایه مخفی}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}روابط پیشرو (\lr {Forward Pass})}{3}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}روابط پسرو (\lr {Backward Pass})}{3}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}تحلیل نتایج و تصاویر}{3}{subsection.3.3}%
+\contentsline {section}{\numberline {4}ب) شبکه عصبی عاطفی (\lr {Emotional NN})}{4}{section.4}%
+\contentsline {subsection}{\numberline {4.1}روابط پیشرو}{4}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}روابط پسرو}{4}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}تحلیل نتایج}{4}{subsection.4.3}%
+\contentsline {section}{\numberline {5}ج) آموزش ضرایب عاطفی ($k_1, k_2$)}{5}{section.5}%
+\contentsline {subsection}{\numberline {5.1}روابط پسرو (آموزش $\alpha $)}{5}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}تحلیل نتایج}{5}{subsection.5.2}%
+\contentsline {section}{\numberline {6}د) شبکه عاطفی با نورون‌های سیگموئید انعطاف‌پذیر}{6}{section.6}%
+\contentsline {subsection}{\numberline {6.1}روابط پیشرو و پسرو}{6}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}تحلیل نتایج}{6}{subsection.6.2}%
+\contentsline {section}{\numberline {7}ه) شبکه کاملاً انعطاف‌پذیر}{7}{section.7}%
+\contentsline {subsection}{\numberline {7.1}روابط پسرو}{7}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}تحلیل نتایج}{7}{subsection.7.2}%
+\contentsline {section}{\numberline {8}جمع‌بندی و مقایسه نهایی}{7}{section.8}%

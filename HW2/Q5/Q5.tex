@@ -1,0 +1,107 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{xepersian}
+\settextfont{Amiri}
+\setlatintextfont{Times New Roman}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{booktabs}
+
+\title{تکلیف دوم درس شبکه های عصبی}
+\author{وحید ملکی، پوریا دادستان}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section*{سوال ۵: پیش‌بینی فعال‌سازی هشدار آتش‌سوزی با شبکه عصبی \lr{MLP}}
+	
+	\subsection*{۱. مقدمه و پیش‌پردازش داده‌ها}
+	در این پروژه، هدف طراحی یک مدل شبکه عصبی برای پیش‌بینی وضعیت هشدار آتش‌سوزی در خانه‌های هوشمند بر اساس داده‌های سنسورهای محیطی است. مجموعه داده شامل حدود ۷۰,۰۰۰ نمونه با ویژگی‌های مختلف (دما، رطوبت، غلظت گازها و ...) است.
+	
+	\subsubsection*{۱-۱. مدیریت مقادیر گمشده \lr{(Missing Values)}}
+	پس از بارگذاری داده‌ها، مشخص شد که حدود $162,747$ مقدار گمشده در دیتاست وجود دارد. برای مدیریت این مقادیر از روش‌های زیر استفاده شد:
+	\begin{itemize}
+		\item \textbf{ویژگی‌های عددی:} از میانه \lr{(Median)} استفاده شد، زیرا نسبت به میانگین در برابر داده‌های پرت مقاوم‌تر است.
+		\item \textbf{ویژگی‌های دسته‌بندی:} از مد \lr{(Mode)} یا پرتکرارترین مقدار استفاده شد.
+	\end{itemize}
+	
+	\subsubsection*{۱-۲. کدگذاری ویژگی‌های گسسته \lr{(Encoding)}}
+	ویژگی‌های غیرعددی مانند جهت وزش باد (\lr{SteamDir}, \lr{RedLightDir}) با استفاده از روش \lr{Label Encoding} به اعداد تبدیل شدند. متغیر هدف (\lr{FireAlarm}) نیز به صورت دودویی ($0$ برای خیر و $1$ برای بله) کدگذاری شد.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.6\textwidth]{Distribution of Target Variable (FireAlarm).png}
+		\caption{توزیع متغیر هدف (\lr{FireAlarm}). مشاهده می‌شود که عدم توازن کلاس مشهود است (تعداد نمونه‌های "خیر" بسیار بیشتر از "بله" است).}
+	\end{figure}
+	
+	\subsubsection*{۱-۳. شناسایی داده‌های پرت و نرمال‌سازی}
+	برای شناسایی داده‌های پرت از روش امتیاز استاندارد \lr{(Z-Score)} با آستانه $3$ استفاده شد. در نتیجه، حدود $4335$ نمونه پرت حذف گردید و تعداد نمونه‌ها به $65,664$ رسید. سپس داده‌ها با استفاده از \lr{Standard Scaler} نرمال‌سازی شدند تا میانگین هر ویژگی صفر و انحراف معیار آن یک شود. این کار برای همگرایی سریع‌تر گرادیان نزولی حیاتی است.
+	
+	\subsection*{۲. بررسی تفکیک‌پذیری خطی (شبکه پرسپترون)}
+	یک شبکه پرسپترون تک لایه \lr{(Single Layer Perceptron)} طراحی شد تا خطی بودن داده‌ها بررسی شود. نتایج نشان داد که دقت کلی مدل حدود $84.79\%$ است، اما در شناسایی کلاس اقلیت (آتش‌سوزی) ضعیف عمل می‌کند (\lr{Recall} برابر $0.44$). این نشان می‌دهد که داده‌ها به طور کامل خطی جدایی‌پذیر نیستند و برای دستیابی به عملکرد بهتر، به مدل‌های پیچیده‌تر و غیرخطی نیاز است.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{subfigure}[b]{0.45\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{Perceptron Loss Curve.png}
+			\caption{منحنی خطای آموزش و آزمون پرسپترون}
+		\end{subfigure}
+		\hfill
+		\begin{subfigure}[b]{0.45\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{Perceptron Confusion Matrix.png}
+			\caption{ماتریس درهم‌ریختگی پرسپترون}
+		\end{subfigure}
+		\caption{نتایج ارزیابی مدل خطی پرسپترون}
+	\end{figure}
+	
+	\subsection*{۳. طراحی و بهینه‌سازی شبکه عصبی چندلایه \lr{(MLP)}}
+	با توجه به عدم توازن شدید کلاس‌ها (تعداد نمونه‌های سالم حدود ۴ برابر نمونه‌های آتش‌سوزی)، از تکنیک \textbf{وزن‌دهی به تابع هزینه \lr{(Weighted Loss)}} استفاده شد. وزن کلاس مثبت حدود $3.88$ محاسبه گردید تا مدل تنبیه بیشتری برای عدم تشخیص آتش‌سوزی دریافت کند.
+	
+	\subsubsection*{۳-۱. معماری شبکه پیشنهادی}
+	پس از آزمایش‌های متعدد، معماری زیر انتخاب شد:
+	\begin{itemize}
+		\item \textbf{لایه ورودی:} ۲۰ نورون (متناظر با ویژگی‌ها)
+		\item \textbf{لایه مخفی ۱:} ۶۴ نورون با تابع فعال‌ساز \lr{ReLU} و لایه \lr{Dropout} با نرخ $0.2$
+		\item \textbf{لایه مخفی ۲:} ۳۲ نورون با تابع فعال‌ساز \lr{ReLU}
+		\item \textbf{لایه خروجی:} ۱ نورون (پیش‌بینی باینری)
+	\end{itemize}
+	
+	\subsubsection*{۳-۲. تحلیل نتایج نهایی}
+	مدل \lr{MLP} بهینه شده توانست به دقت کلی $79.87\%$ دست یابد. نکته حائز اهمیت، افزایش چشمگیر نرخ فراخوانی \lr{(Recall)} برای کلاس آتش‌سوزی به $0.78$ است (در مقایسه با $0.44$ در پرسپترون). این یعنی مدل توانسته است اکثر موارد واقعی آتش‌سوزی را شناسایی کند، هرچند به قیمت کاهش اندکی در دقت کلی (افزایش هشدارهای کاذب). در سیستم‌های ایمنی، شناسایی خطر اولویت بالاتری نسبت به دقت کلی دارد.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{subfigure}[b]{0.45\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{MLP (Weighted) Loss Curve.png}
+			\caption{منحنی خطای مدل \lr{MLP}}
+		\end{subfigure}
+		\hfill
+		\begin{subfigure}[b]{0.45\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{Optimized MLP Confusion Matrix.png}
+			\caption{ماتریس درهم‌ریختگی مدل \lr{MLP}}
+		\end{subfigure}
+		\caption{نتایج نهایی شبکه عصبی بهینه شده با تابع هزینه وزن‌دار}
+	\end{figure}
+	
+	\subsection*{۴. نتیجه‌گیری}
+	این پروژه نشان داد که:
+	\begin{enumerate}
+		\item پیش‌پردازش دقیق (حذف داده‌های پرت و نرمال‌سازی) تأثیر بسزایی در پایداری آموزش دارد.
+		\item داده‌های این مسئله به طور کامل خطی جدایی‌پذیر نیستند.
+		\item استفاده از شبکه عصبی عمیق‌تر همراه با استراتژی مدیریت عدم توازن (مانند \lr{Weighted BCE Loss}) باعث بهبود قابل توجه در شناسایی رخدادهای حساس (آتش‌سوزی) می‌شود.
+	\end{enumerate}
+	
+\end{document}

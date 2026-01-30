@@ -1,0 +1,152 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{xepersian}
+\settextfont{Amiri}
+\setlatintextfont{Times New Roman}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{booktabs}
+
+\title{تکلیف دوم درس شبکه های عصبی}
+\author{وحید ملکی، پوریا دادستان}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section*{سوال ۳: طراحی و تحلیل شبکه عصبی ۴ لایه با رویکردهای عاطفی و انعطاف‌پذیر}
+	
+	\subsection*{۱. شرح مسئله و اهداف}
+	در این پروژه، یک شبکه عصبی پرسپترون چندلایه \lr{(MLP)} با ۴ لایه طراحی و پیاده‌سازی شده است. هدف اصلی بررسی تأثیر پارامترهای انعطاف‌پذیر (توابع فعال‌ساز با پارامتر قابل آموزش $\alpha$) و مکانیزم یادگیری عاطفی \lr{(Emotional Learning)} بر عملکرد شبکه در دو وظیفه رگرسیون و کلاسبندی است. پیاده‌سازی به صورت کاملاً پایه \lr{(Scratch)} و بدون استفاده از کتابخانه‌های آماده شبکه عصبی انجام شده است.
+	
+	\subsection*{۲. مدل ریاضی و الگوریتم‌های پیاده‌سازی شده}
+	
+	\subsubsection*{۲-۱. تابع فعال‌ساز انعطاف‌پذیر}
+	طبق صورت سوال، تابع فعال‌ساز برای لایه‌های پنهان به صورت زیر تعریف شده است:
+	\begin{equation}
+		f(net, \alpha) = \frac{1}{\alpha} + \frac{1 - e^{\alpha \cdot net}}{1 + e^{\alpha \cdot net}}
+	\end{equation}
+	با استفاده از اتحاد ریاضی $\frac{1 - e^u}{1 + e^u} = -\tanh(\frac{u}{2})$، فرم پایدارتر زیر برای پیاده‌سازی عددی استفاده شد تا از مشکلات سرریز \lr{(Overflow)} جلوگیری شود:
+	\begin{equation}
+		f(net, \alpha) = \frac{1}{\alpha} - \tanh\left(\frac{\alpha \cdot net}{2}\right)
+	\end{equation}
+	
+	\subsubsection*{۲-۲. تابع هزینه و تنظیم‌کننده‌ها \lr{(Regularization)}}
+	تابع هزینه کل شامل مجموع مربعات خطا \lr{(MSE)} و جریمه‌های وزن برای هر لایه است:
+	\begin{equation}
+		E_{total} = \sum (y - \hat{y})^2 + \lambda_1 \sum (W^1)^2 + \lambda_2 \sum (W^2)^2 + \lambda_3 \sum (W^3)^3 + \lambda_4 \sum (W^4)^2
+	\end{equation}
+	که مقادیر $\lambda_1=\lambda_2=0.5$ و $\lambda_3=\lambda_4=0.25$ در نظر گرفته شدند. توجه شود که برای لایه سوم، توان ۳ برای جریمه در نظر گرفته شده است.
+	
+	\subsubsection*{۲-۳. روابط پسرو \lr{(Backward Pass)} و مشتقات}
+	برای آموزش شبکه از الگوریتم پس‌انتشار خطا با بهینه‌ساز \lr{Adam} استفاده شده است. مشتقات کلیدی عبارتند از:
+	
+	\textbf{الف) مشتق تابع فعال‌ساز نسبت به ورودی ($net$):}
+	\begin{equation}
+		\frac{\partial f}{\partial net} = -\frac{\alpha}{2} \left( 1 - \tanh^2\left(\frac{\alpha \cdot net}{2}\right) \right)
+	\end{equation}
+	
+	\textbf{ب) مشتق تابع فعال‌ساز نسبت به پارامتر انعطاف‌پذیر ($\alpha$):}
+	این مشتق برای آموزش پارامتر $\alpha$ در سناریوهای C و D استفاده می‌شود:
+	\begin{equation}
+		\frac{\partial f}{\partial \alpha} = -\frac{1}{\alpha^2} - \frac{net}{2} \left( 1 - \tanh^2\left(\frac{\alpha \cdot net}{2}\right) \right)
+	\end{equation}
+	
+	\textbf{ج) مشتق تابع هزینه نسبت به وزن‌ها (با لحاظ کردن جریمه):}
+	\begin{equation}
+		\frac{\partial E}{\partial W} = \delta \cdot X^T + \frac{\partial \text{Reg}}{\partial W}
+	\end{equation}
+	که برای لایه ۳ با جریمه مکعبی، ترم جریمه برابر است با: $\lambda_3 \cdot 3 \cdot W^2 \cdot \text{sign}(W)$.
+	
+	\subsubsection*{۲-۴. یادگیری عاطفی \lr{(Emotional Learning)}}
+	در سناریوهای B، C و D، سیگنال خطای بازگشتی طبق فرمول زیر اصلاح می‌شود تا تاریخچه خطا در آن لحاظ گردد:
+	\begin{equation}
+		\text{Error}_{\text{emo}} = k_1 \cdot e(t) + k_2 \cdot (e(t) - e(t-1))
+	\end{equation}
+	که در آن $k_1 = 0.9$ و $k_2 = 0.1$ تنظیم شده است.
+	
+	\subsection*{۳. پیکربندی آزمایش‌ها}
+	داده‌ها به نسبت $70\%$ آموزش و $30\%$ آزمون تقسیم شدند. برای پایداری همگرایی، ورودی‌ها با روش \lr{Standard Scaler} نرمال‌سازی شدند. همچنین برای کلاسبندی، مقادیر هدف \lr{(Targets)} به بازه $[0.1, 0.9]$ نگاشت شدند تا با دامنه خروجی تابع فعال‌ساز سازگار باشند.
+	
+	\begin{table}[H]
+		\centering
+		\caption{تنظیمات هایپرپارامترها برای ۴ سناریو}
+		\begin{tabular}{|c|c|c|c|c|}
+			\hline
+			\textbf{سناریو} & \textbf{نوع شبکه} & \textbf{وضعیت $\alpha$} & \textbf{نرخ یادگیری} & \textbf{تعداد تکرار} \\
+			\hline
+			A & معمولی & ثابت ($1.0$) & $0.01$ & $500$ \\
+			B & عاطفی & ثابت ($1.0$) & $0.01$ & $500$ \\
+			C & عاطفی + منعطف & قابل آموزش & $0.01$ & $500$ \\
+			D & عاطفی + منعطف + تطبیقی & قابل آموزش & متغیر (تطبیقی) & $500$ \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	\textbf{معماری شبکه:} برای تمامی آزمایش‌ها از یک شبکه ۴ لایه با تعداد نورون‌های زیر استفاده شد:
+	$$ [\text{Input}, 15, 12, 8, \text{Output}] $$
+	
+	\subsection*{۴. تحلیل نتایج و نمودارها}
+	
+	\subsubsection*{۴-۱. تحلیل نتایج رگرسیون \lr{(ECG و Lorenz)}}
+	نتایج کاهش خطا \lr{(MSE)} برای دیتاست‌های سری زمانی در شکل‌های زیر نمایش داده شده است.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.9\textwidth]{ECG_loss.png}
+		\caption{روند کاهش خطای آموزش و آزمون برای دیتاست \lr{ECG} در ۴ سناریو}
+	\end{figure}
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.9\textwidth]{Lorenz_loss.png}
+		\caption{روند کاهش خطای آموزش و آزمون برای دیتاست \lr{Lorenz} در ۴ سناریو}
+	\end{figure}
+	
+	\textbf{تحلیل:} همانطور که در نمودارها و جداول خروجی مشاهده می‌شود، سناریوی \textbf{C (عاطفی + منعطف)} بهترین عملکرد را از نظر کمترین خطای نهایی داشته است.
+	\begin{itemize}
+		\item در دیتاست \lr{ECG}، خطای آزمون در سناریوی C به حدود $0.73$ رسید که نسبت به حالت معمولی ($0.86$) بهبود قابل توجهی دارد.
+		\item در دیتاست \lr{Lorenz}، سناریوی D (تطبیقی) با خطای $0.17$ رکورددار کمترین خطاست که نشان‌دهنده تأثیر مثبت نرخ یادگیری تطبیقی در داده‌های آشوب‌گونه است.
+		\item همگرایی در سناریوهای دارای پارامتر منعطف ($\alpha$) سریع‌تر و پایدارتر بوده است.
+	\end{itemize}
+	
+	\subsubsection*{۴-۲. تحلیل نتایج کلاسبندی \lr{(Wine و Iris)}}
+	ماتریس‌های درهم‌ریختگی \lr{(Confusion Matrix)} برای ۴ سناریو در شکل‌های زیر آمده است.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.9\textwidth]{Wine_cm.png}
+		\caption{ماتریس درهم‌ریختگی و دقت نهایی برای دیتاست \lr{Wine}}
+	\end{figure}
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.9\textwidth]{Iris_cm.png}
+		\caption{ماتریس درهم‌ریختگی و دقت نهایی برای دیتاست \lr{Iris}}
+	\end{figure}
+	
+	\textbf{تحلیل:}
+	\begin{itemize}
+		\item \textbf{دیتاست \lr{Wine}:} تمامی سناریوها به دقت بسیار بالای $98.15\%$ دست یافتند. این نشان می‌دهد که معماری ۴ لایه برای تفکیک این داده‌ها بسیار قدرتمند عمل کرده است. ثبات نتایج در سناریوهای مختلف نشان‌دهنده پایداری روش پیاده‌سازی شده (استفاده از \lr{He Init} و \lr{Adam}) است.
+		\item \textbf{دیتاست \lr{Iris}:} سناریوی \textbf{C (عاطفی + منعطف)} با دقت $95.56\%$ بهترین عملکرد را ثبت کرد. در حالی که مدل معمولی (A) دقت $93.33\%$ داشت. این افزایش دقت نشان می‌دهد که قابلیت تنظیم شیب تابع فعال‌ساز ($\alpha$) به شبکه کمک کرده تا مرزهای تصمیم‌گیری دقیق‌تری بین کلاس‌های نزدیک به هم (مانند \lr{Versicolor} و \lr{Virginica}) ترسیم کند.
+		\item سناریوی D در کلاسبندی \lr{Iris} کمی افت دقت داشت ($88.89\%$) که می‌تواند ناشی از حساسیت بالای نرخ یادگیری تطبیقی در دیتاست‌های کوچک باشد که منجر به پرش از مینیمم سراسری می‌شود.
+	\end{itemize}
+	
+	\subsection*{۵. نتیجه‌گیری نهایی}
+	نتایج حاصل از این پژوهش عملی نشان می‌دهد که:
+	\begin{enumerate}
+		\item استفاده از توابع فعال‌ساز انعطاف‌پذیر (با پارامتر آموزش‌پذیر $\alpha$) به طور کلی منجر به کاهش خطای رگرسیون و افزایش دقت کلاسبندی می‌شود.
+		\item رویکرد یادگیری عاطفی با لحاظ کردن تغییرات خطا، به همگرایی نرم‌تر کمک می‌کند، هرچند تأثیر آن به تنهایی کمتر از پارامترهای منعطف است.
+		\item ترکیب این دو روش (سناریوی \lr{C}) پایدارترین و بهترین نتایج را ارائه داد.
+		\item استفاده از بهینه‌سازهای مدرن مانند \lr{Adam} و مقداردهی اولیه صحیح (\lr{He Initialization}) برای آموزش شبکه‌های عمیق با توابع فعال‌ساز خاص، حیاتی است.
+	\end{enumerate}
+	
+\end{document}

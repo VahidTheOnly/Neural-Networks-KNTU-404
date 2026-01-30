@@ -1,0 +1,262 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{xepersian}
+\settextfont{Amiri} 
+\setlatintextfont{Times New Roman}
+
+\title{گزارش تمرین دوم: آموزش شبکه‌های عصبی پیشرفته با الگوریتم گوس-نیوتن}
+\author{وحید ملکی و پوریا دادستان}
+\date{17 آذر 1404}
+
+\begin{document}
+	
+	\maketitle
+	\newpage
+	
+	\section{مقدمه}
+	در این تمرین، هدف پیاده‌سازی و تحلیل شبکه‌های عصبی پیشرفته با ساختارهای مختلف (معمولی، عاطفی و انعطاف‌پذیر) است که با استفاده از الگوریتم بهینه‌سازی مرتبه دوم گوس-نیوتن (\lr{Gauss-Newton}) آموزش داده شده‌اند. این الگوریتم با استفاده از اطلاعات انحنای تابع هزینه (تقریب ماتریس هسین)، سرعت همگرایی بالاتری نسبت به روش‌های گرادیان نزولی معمول دارد. تمامی پیاده‌سازی‌ها به زبان پایتون و به صورت \lr{Scratch} (بدون استفاده از فریم‌ورک‌هایی نظیر \lr{PyTorch}) انجام شده است تا جزئیات دقیق محاسبات ماتریسی و مشتق‌گیری‌ها قابل کنترل باشد.
+	
+	\section{شرح پیاده‌سازی و معماری سیستم}
+	
+	\subsection{ساختار کد و تحلیل جریان داده}
+	کد پیاده‌سازی شده دارای ساختار شی‌ءگرا بوده و جریان اجرای برنامه از بارگذاری داده تا نمایش نتایج به صورت زیر طراحی شده است:
+	
+	\begin{enumerate}
+		\item \textbf{\lr{DataLoader}:} این کلاس وظیفه استخراج، پاک‌سازی و نرمال‌سازی داده‌ها را بر عهده دارد. داده‌های خام دریافت شده، نرمال‌سازی شده و به فرمت ماتریس‌های $(X, y)$ تبدیل می‌شوند. برای داده‌های سری زمانی، از تکنیک پنجره لغزان (\lr{Sliding Window}) استفاده می‌شود.
+		
+		\item \textbf{\lr{run\_standard\_mlp}:} این تابع به عنوان "اتاق فرمان" عمل می‌کند. معماری شبکه (تعداد لایه‌ها و نورون‌ها) در اینجا تعریف شده و نمونه‌ای از کلاس مدل ساخته می‌شود.
+		
+		\item \textbf{\lr{train loop}:} فرآیند تکرار شونده آموزش در این بخش مدیریت می‌شود. در هر تکرار (\lr{Epoch})، گام بهینه‌سازی گوس-نیوتن فراخوانی می‌شود.
+		
+		\item \textbf{\lr{gauss\_newton\_step}:} این متد، قلب محاسباتی الگوریتم است که شامل مراحل زیر می‌باشد:
+		\begin{itemize}
+			\item \textbf{\lr{flatten}:} تمامی پارامترهای شبکه (وزن‌ها، بایاس‌ها و پارامترهای انعطاف‌پذیر) که در دیکشنری‌های جداگانه هستند، به یک بردار ستونی واحد $\theta$ تبدیل می‌شوند.
+			\item \textbf{\lr{compute\_jacobian}:} با انتشار رو به عقب، حساسیت خروجی تک‌تک نمونه‌ها نسبت به تک‌تک پارامترها محاسبه شده و ماتریس ژاکوبین $J$ ساخته می‌شود.
+			\item \textbf{\lr{solve}:} سیستم معادلات خطی $(J^T J + \mu I)\Delta \theta = J^T e$ حل می‌شود تا بهترین جهت تغییر وزن‌ها ($\Delta \theta$) پیدا شود.
+			\item \textbf{\lr{unflatten}:} بردار به‌روزرسانی شده پارامترها مجدداً تفکیک شده و در ساختار لایه‌های شبکه قرار می‌گیرد.
+		\end{itemize}
+		
+		\item \textbf{\lr{plot\_final\_results}:} در نهایت نتایج کمی و کیفی مدل بر روی داده‌های آزمون مصورسازی می‌شوند.
+	\end{enumerate}
+	
+	\subsection{ریاضیات بهینه‌سازی گوس-نیوتن}
+	در روش گوس-نیوتن، هدف کمینه‌سازی مجموع مربعات خطا $E(\theta) = \frac{1}{2} \|e(\theta)\|^2$ است. با بسط تیلور بردار خطا حول نقطه فعلی و صفر قرار دادن مشتقات، قانون به‌روزرسانی وزن‌ها به صورت زیر استخراج می‌شود:
+	\begin{equation}
+		\theta_{new} = \theta_{old} - (J^T J + \mu I)^{-1} J^T e
+	\end{equation}
+	در اینجا $\mu$ ضریب تعدیل (\lr{Damping Factor}) است که پایداری معکوس‌گیری را تضمین می‌کند (مشابه روش لونبرگ-مارکوارت).
+	
+	\subsection{تنظیمات پارامترها}
+	برای یکسان‌سازی شرایط و مقایسه عادلانه، تنظیمات زیر در تمام آزمایش‌ها اعمال شده است:
+	\begin{itemize}
+		\item \textbf{تقسیم داده‌ها:} $70\%$ برای آموزش و $30\%$ برای آزمون.
+		\item \textbf{معماری شبکه:} شبکه‌ها دارای $3$ لایه مخفی هستند. تعداد نورون‌ها معمولاً به صورت $[10, 10, 10]$ در نظر گرفته شده است.
+		\item \textbf{پیش‌پردازش:} نرمال‌سازی داده‌ها با \lr{MinMaxScaler} در بازه $[0, 1]$ و کدگذاری \lr{One-Hot} برای خروجی‌های طبقه‌بندی.
+	\end{itemize}
+	
+	\newpage
+	\section{الف) شبکه عصبی معمولی با سه لایه مخفی}
+	در این بخش یک شبکه پرسپترون چندلایه (\lr{MLP}) استاندارد پیاده‌سازی شده است.
+	
+	\subsection{روابط پیشرو (\lr{Forward Pass})}
+	برای لایه $l$ام با ورودی $a^{(l-1)}$، خروجی به صورت زیر محاسبه می‌شود:
+	\begin{equation}
+		net^{(l)} = W^{(l)} a^{(l-1)} + b^{(l)}
+	\end{equation}
+	\begin{equation}
+		a^{(l)} = f(net^{(l)})
+	\end{equation}
+	که $f$ برای لایه‌های مخفی \lr{Sigmoid} و برای لایه آخر (در طبقه‌بندی) \lr{Softmax} است.
+	
+	\subsection{روابط پسرو دقیق (\lr{Exact Jacobian Calculation})}
+	برخلاف آموزش‌های مبتنی بر گرادیان نزولی که فقط به $\frac{\partial E}{\partial W}$ نیاز دارند، در اینجا ما نیاز به محاسبه ماتریس ژاکوبین $J$ داریم که درایه $(i,j)$ آن برابر با $\frac{\partial e_i}{\partial w_j}$ است.
+	برای این منظور، یک بردار با درایه یک در خروجی $k$ و صفر در سایر درایه‌ها ($\delta^L$) در نظر گرفته شده و در شبکه به عقب انتشار می‌یابد:
+	\begin{equation}
+		\delta^{(l-1)} = (W^{(l)})^T \delta^{(l)} \odot f'(net^{(l-1)})
+	\end{equation}
+	و گرادیان وزن‌ها برای سطر مربوطه در ماتریس ژاکوبین برابر است با:
+	\begin{equation}
+		\frac{\partial o_k}{\partial W^{(l)}} = \delta^{(l)} (a^{(l-1)})^T
+	\end{equation}
+	
+	\subsection{تحلیل نتایج و تصاویر}
+	برای دادهگان \lr{Temperature}، مدل توانسته است با خطای \lr{MSE} بسیار پایین ($0.00611$) روند کلی دما را پیش‌بینی کند. همچنین در دیتاست \lr{Iris}، دقت $100\%$ حاصل شده است که نشان‌دهنده قدرت روش گوس-نیوتن در همگرایی سریع برای مسائل با ابعاد کوچک است.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{subfigure}{0.48\textwidth}
+			\includegraphics[width=\linewidth]{Standard MLP (temperature)_regression.png}
+			\caption{رگرسیون داده‌های دما - شبکه معمولی}
+		\end{subfigure}
+		\hfill
+		\begin{subfigure}{0.48\textwidth}
+			\includegraphics[width=\linewidth]{Standard MLP (iris)_confusion_matrix.png}
+			\caption{ماتریس درهم‌ریختگی دیتاست آیریس}
+		\end{subfigure}
+		\caption{نتایج شبکه عصبی معمولی}
+	\end{figure}
+	
+	\newpage
+	\section{ب) شبکه عصبی عاطفی (\lr{Emotional NN})}
+	در این شبکه، هدف شبیه‌سازی رفتار سیستم‌های لیمبیک مغز است. ایده اصلی این است که فرآیند یادگیری نباید تنها متکی به مقدار مطلق خطا باشد، بلکه باید به روند تغییرات خطا و گذشته آن نیز واکنش نشان دهد. به همین منظور، به جای استفاده از خطای مستقیم، از یک \textbf{سیگنال عاطفی ($r$)} استفاده می‌شود.
+	
+	\subsection{روابط پیشرو و تعریف سیگنال عاطفی}
+	سیگنال عاطفی $r$ با الهام از کنترل‌کننده‌های \lr{PD} (تناسبی-مشتق‌گیر) تعریف می‌شود. این سیگنال ترکیبی خطی از خطای لحظه‌ای و تغییرات خطا نسبت به گام‌های پیشین است:
+	\begin{equation}
+		r(k) = k_1 e(k) + k_2 \Delta e(k) \approx k_1 e(k) + k_2 (e(k) - e(k-1))
+	\end{equation}
+	در این رابطه:
+	\begin{itemize}
+		\item $e(k)$: خطای لحظه‌ای در گام $k$.
+		\item $e(k-1)$: خطای تاخیر یافته (با فرض تاخیر $D=1$).
+		\item $k_1$: ضریب اهمیت خطای لحظه‌ای.
+		\item $k_2$: ضریب اهمیت روند تغییرات خطا.
+	\end{itemize}
+	این مکانیزم باعث می‌شود شبکه در مواجهه با نوسانات ناگهانی یا خطاهای در حال رشد، واکنش شدیدتری نشان دهد و پایداری سیستم در سری‌های زمانی نویزی افزایش یابد.
+	
+	\subsection{روابط پسرو و اثبات ماتریس ژاکوبین عاطفی}
+	در فاز آموزش، هدف ما کمینه‌سازی نرم سیگنال عاطفی $\|r\|^2$ است. بنابراین باید ماتریس ژاکوبین نسبت به $r$ محاسبه شود: $J_{emo} = \frac{\partial r}{\partial W}$.
+	با استفاده از قاعده زنجیره‌ای و بسط رابطه $r$:
+	\begin{equation}
+		\frac{\partial r(k)}{\partial W} = k_1 \frac{\partial e(k)}{\partial W} + k_2 \left( \frac{\partial e(k)}{\partial W} - \frac{\partial e(k-1)}{\partial W} \right)
+	\end{equation}
+	با فرض اینکه وزن‌های فعلی تاثیر ناچیزی بر خطای گام‌های گذشته دارند (تقریب استاندارد در شبکه‌های غیر بازگشتی)، می‌توان فرض کرد $\frac{\partial e(k-1)}{\partial W} \approx 0$. همچنین می‌دانیم ژاکوبین استاندارد $J_{std} = \frac{\partial \hat{y}}{\partial W}$ و $\frac{\partial e}{\partial W} = -J_{std}$. با جایگذاری این مقادیر:
+	\begin{equation}
+		J_{emo} \approx (k_1 + k_2) \frac{\partial e(k)}{\partial W} = -(k_1 + k_2) J_{std}
+	\end{equation}
+	در پیاده‌سازی کد، این رابطه به صورت ماتریسی اعمال شده است. نکته مهم این است که به دلیل وجود علامت منفی در رابطه فوق، جهت به‌روزرسانی در گام گوس-نیوتن معکوس می‌شود:
+	\begin{equation}
+		W_{new} = W_{old} - \alpha \cdot \Delta W \quad (\text{Instead of } +)
+	\end{equation}
+	
+	\subsection{تحلیل نتایج}
+	برای داده‌های بورس (\lr{Stock}) که دارای نویز و نوسانات شدید هستند، استفاده از شبکه عاطفی با تأخیر زمانی $2$ گام، منجر به \lr{MSE} برابر با $0.00123$ شد. این بهبود ناشی از طبیعت نویزگیر سیگنال عاطفی است که مانند یک فیلتر پایین‌گذر عمل کرده و از بیش‌برازش روی نویزهای لحظه‌ای جلوگیری می‌کند.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.7\linewidth]{Emotional (stock) (Delay=2, Trainable=False)_regression.png}
+		\caption{پیش‌بینی شاخص بورس با شبکه عاطفی (تأخیر 2 گام)}
+	\end{figure}
+	
+	\newpage
+	\section{ج) آموزش ضرایب عاطفی ($k_1, k_2$)}
+	در بخش پیشرفته‌تر، ضرایب $k_1$ و $k_2$ به عنوان فراپارامتر ثابت در نظر گرفته نشده‌اند، بلکه خودشان به عنوان پارامترهای قابل آموزش وارد فرآیند بهینه‌سازی می‌شوند.
+	
+	\subsection{پارامترسازی با تابع Softmax}
+	برای تضمین پایداری آموزش، دو محدودیت باید روی $k$ اعمال شود: ۱. همواره مثبت باشند، ۲. مجموع آن‌ها نرمال شده باشد ($k_1+k_2=1$). بدین منظور از پارامترهای کمکی $\alpha$ و تابع \lr{Softmax} استفاده شده است:
+	\begin{equation}
+		k_i = \frac{e^{\alpha_i}}{\sum_{j} e^{\alpha_j}}
+	\end{equation}
+	در کد پیاده‌سازی شده، برای جلوگیری از سرریز عددی (\lr{Overflow})، از تکنیک \lr{Stable Softmax} استفاده شده است: $k_i = \text{softmax}(\alpha_i - \max(\alpha))$.
+	
+	\subsection{مشتقات جزئی برای آموزش $\alpha$}
+	برای به‌روزرسانی پارامترهای $\alpha$ توسط الگوریتم گوس-نیوتن، نیاز است ستون‌های جدیدی به ماتریس ژاکوبین اضافه شود. طبق قاعده زنجیره‌ای:
+	\begin{equation}
+		\frac{\partial r}{\partial \alpha_i} = \frac{\partial r}{\partial k_1}\frac{\partial k_1}{\partial \alpha_i} + \frac{\partial r}{\partial k_2}\frac{\partial k_2}{\partial \alpha_i}
+	\end{equation}
+	مشتقات جزئی سیگنال عاطفی نسبت به $k$ عبارتند از:
+	\begin{equation}
+		\frac{\partial r}{\partial k_1} = e(k), \quad \frac{\partial r}{\partial k_2} = e(k) - e(k-1)
+	\end{equation}
+	و مشتقات تابع \lr{Softmax} نسبت به ورودی‌هایش که در متد \lr{\_compute\_softmax\_grads} پیاده‌سازی شده‌اند:
+	\begin{equation}
+		\frac{\partial k_i}{\partial \alpha_j} = k_i (\delta_{ij} - k_j)
+	\end{equation}
+	این مشتقات دقیق محاسبه شده و در ستون‌های انتهایی ماتریس ژاکوبین درج می‌شوند تا ضرایب عاطفی همزمان با وزن‌های شبکه بهینه گردند.
+	
+	\subsection{تحلیل نتایج}
+	در دیتاست دما، شبکه توانست ضرایب بهینه $k_1 \approx 0.24$ و $k_2 \approx 0.75$ را یاد بگیرد. مقدار بالای $k_2$ نشان می‌دهد که در این سری زمانی خاص، "روند تغییرات دما" اطلاعات ارزشمندتری نسبت به مقدار لحظه‌ای دما برای پیش‌بینی آینده دارد.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{subfigure}{0.48\textwidth}
+			\includegraphics[width=\linewidth]{Emotional (temperature) (Delay=1, Trainable=True)_regression.png}
+			\caption{رگرسیون دما با ضرایب عاطفی آموزش‌پذیر}
+		\end{subfigure}
+		\hfill
+		\begin{subfigure}{0.48\textwidth}
+			\includegraphics[width=\linewidth]{Emotional (iris) (Delay=1, Trainable=True)_confusion_matrix.png}
+			\caption{ماتریس درهم‌ریختگی آیریس (عاطفی)}
+		\end{subfigure}
+		\caption{نتایج شبکه عاطفی با پارامترهای متغیر}
+	\end{figure}
+	
+	\newpage
+	\section{د) شبکه عاطفی با نورون‌های سیگموئید انعطاف‌پذیر}
+	در این بخش، تابع فعال‌ساز استاندارد با یک تابع انعطاف‌پذیر پارامتریک جایگزین شده است:
+	\begin{equation}
+		f(net, a) = \frac{2|a|}{1 + e^{-|a| \cdot net}}
+	\end{equation}
+	
+	\subsection{روابط پیشرو و پسرو}
+	در فاز پیشرو، پارامتر $a$ شیب و دامنه تابع را کنترل می‌کند. در فاز پسرو، مشتق خروجی نسبت به پارامتر $a$ برای تشکیل ماتریس ژاکوبین محاسبه می‌شود:
+	\begin{equation}
+		\frac{\partial f}{\partial a} = \text{sign}(a) \frac{2}{1+e^{-|a|net}} + 2|a| \frac{e^{-|a|net} \cdot \text{sign}(a) \cdot net}{(1+e^{-|a|net})^2}
+	\end{equation}
+	این مشتق به الگوریتم اجازه می‌دهد تا علاوه بر وزن‌ها، شکل تابع فعال‌ساز را نیز برای هر نورون بهینه کند.
+	
+	\subsection{تحلیل نتایج}
+	این ساختار بر روی دیتاست \lr{Parkinsons} تست شد و دقت $89.83\%$ حاصل گردید.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.6\linewidth]{Flexible Sigmoid (parkinsons)_confusion_matrix.png}
+		\caption{ماتریس درهم‌ریختگی پارکینسون با سیگموئید انعطاف‌پذیر}
+	\end{figure}
+	
+	\newpage
+	\section{ه) شبکه کاملاً انعطاف‌پذیر}
+	در این حالت از تابع فعال‌ساز پیشنهادی استفاده شده است که دارای دو پارامتر $\alpha$ و $\beta$ است:
+	\begin{equation}
+		f_s(net, \alpha, \beta) = \frac{\alpha}{\beta} + \frac{1 - e^{\frac{\alpha}{\beta} \cdot net}}{1 + e^{\frac{\alpha}{\beta} \cdot net}}
+	\end{equation}
+	
+	\subsection{روابط پسرو و آموزش پارامترها}
+	برای آموزش پارامترهای شکل‌دهنده $\alpha$ و $\beta$، مشتقات جزئی زیر در متد \lr{\_activation\_derivative} محاسبه و در ژاکوبین درج می‌شوند. با فرض $k = \frac{\alpha}{\beta}$:
+	\begin{align}
+		\frac{\partial f}{\partial \alpha} &= \frac{1}{\beta} + \frac{\partial (-\tanh)}{\partial k} \cdot \frac{1}{\beta} \cdot net \\
+		\frac{\partial f}{\partial \beta} &= -\frac{\alpha}{\beta^2} + \frac{\partial (-\tanh)}{\partial k} \cdot (\frac{-\alpha}{\beta^2}) \cdot net
+	\end{align}
+	
+	\subsection{تحلیل نتایج}
+	این مدل قدرتمندترین نتایج را بر روی دیتاست چالش‌برانگیز \lr{Breast Cancer} با دقت $97.56\%$ به ثبت رساند. این نشان می‌دهد که قابلیت تنظیم مستقل شیب و بایاس فعال‌ساز، برای داده‌های پیچیده پزشکی بسیار موثر است.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.6\linewidth]{Fully Flexible (cancer)_confusion_matrix.png}
+		\caption{ماتریس درهم‌ریختگی سرطان سینه (کاملاً انعطاف‌پذیر)}
+	\end{figure}
+	
+	\section{جمع‌بندی و مقایسه نهایی}
+	جدول زیر خلاصه‌ای از نتایج به دست آمده را نشان می‌دهد. همانطور که مشاهده می‌شود، ترکیب الگوریتم گوس-نیوتن با ساختارهای انعطاف‌پذیر، نتایج بسیار دقیقی را فراهم کرده است.
+	
+	\begin{table}[H]
+		\centering
+		\caption{مقایسه عملکرد مدل‌های مختلف (\lr{MSE} برای رگرسیون، \lr{Accuracy} برای طبقه‌بندی)}
+		\label{tab:comparison}
+		\begin{tabular}{lccccc}
+			\toprule
+			\textbf{Model} & \textbf{Temp (MSE)} & \textbf{Stock (MSE)} & \textbf{Iris (Acc)} & \textbf{Cancer (Acc)} & \textbf{Parkinsons (Acc)} \\
+			\midrule
+			MLP Standard & $0.00611$ & $0.00085$ & $100$\% & $96.10$\% & $91.53$\% \\
+			Emotional (Fixed) & - & $0.00123$ & - & $94.63$ & $88.14$\% \\
+			Emotional (Trainable) & $0.00880$ & - & $97.78$\% & -\% & - \\
+			Flexible Sigmoid & $0.00684$ & $0.00080$ & $93.33$\% & $96.10$\% & $89.83$\% \\
+			Fully Flexible & $0.00588$ & $0.00090$ & $71.11$\% & \textbf{$97.56$\%} & $86.44$\% \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	\textbf{نتیجه‌گیری نهایی:} این تمرین نشان داد که اگرچه پیاده‌سازی گوس-نیوتن از پایه پیچیدگی محاسباتی دارد (به ویژه محاسبه ژاکوبین)، اما همگرایی آن بسیار سریع‌تر از روش‌های گرادیان نزولی است. همچنین، مکانیزم‌های عاطفی برای داده‌های نویزی و توابع انعطاف‌پذیر برای طبقه‌بندی‌های با مرزهای غیرخطی پیچیده، کارایی شبکه را به طرز چشمگیری افزایش می‌دهند.
+	
+\end{document}

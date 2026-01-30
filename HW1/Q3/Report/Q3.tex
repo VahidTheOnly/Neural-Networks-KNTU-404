@@ -1,0 +1,109 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{xepersian}
+\settextfont{Amiri}
+\setlatintextfont{Times New Roman}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{booktabs}
+
+\title{تکلیف اول درس شبکه های عصبی}
+\author{وحید ملکی \\ شماره دانشجویی: 40313004}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section*{سوال ۳}
+	
+	\subsection*{الف: رسم توابع فعال‌سازی و مشتق آن‌ها}
+	
+	با استفاده از کتابخانه \lr{matplotlib}، توابع فعال‌سازی زیر به همراه مشتق آن‌ها در بازه $[-5, 5]$ رسم شده‌اند:
+	
+	\begin{itemize}
+		\item ReLU
+		\item Mish
+		\item ELU ($\alpha=1$)
+		\item Sigmoid
+		\item Tanh
+		\item Softplus
+	\end{itemize}
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=\textwidth]{activation_functions_plot.png}
+		\caption{توابع فعال‌سازی (خط آبی پررنگ) و مشتق آن‌ها (خط قرمز نقطه‌چین) برای ReLU، Mish، ELU، Sigmoid، Tanh و Softplus}
+		\label{fig:activations}
+	\end{figure}
+	
+	\subsubsection*{مشاهدات از شکل \ref{fig:activations}}
+	
+	\begin{itemize}
+		\item \textbf{ReLU:} $f(x) = \max(0, x)$ → برای $x > 0$ خطی با شیب ۱، برای $x \leq 0$ صفر. مشتق: ۱ در ناحیه مثبت، ۰ در ناحیه منفی.
+		
+		\item \textbf{Mish:} $f(x) = x \cdot \tanh(\ln(1+e^{x}))$ → نرم‌تر از ReLU، در ناحیه منفی کمی منفی می‌شود. مشتق همیشه مثبت و نرم است.
+		
+		\item \textbf{ELU:} برای $x > 0$ همانند ReLU، برای $x \leq 0$ به صورت نمایی به $\alpha$ نزدیک می‌شود. مشتق در ناحیه منفی $\alpha e^{x}$ → از مرگ نورون جلوگیری می‌کند.
+		
+		\item \textbf{Sigmoid:} $f(x) = \dfrac{1}{1+e^{-x}}$ → خروجی در $[0,1]$، مشتق حداکثر ۰.۲۵ در $x=0$ و در $|x|$ بزرگ به صفر نزدیک می‌شود (اشباع).
+		
+		\item \textbf{Tanh:} $f(x) = \tanh(x)$ → خروجی در $[-1,1]$، متقارن حول صفر، مشتق حداکثر ۱ در $x=0$.
+		
+		\item \textbf{Softplus:} $f(x) = \ln(1 + e^{x})$ → نسخه نرم ReLU. مشتق آن دقیقاً تابع سیگموید است.
+	\end{itemize}
+	
+	\subsection*{ب: مشکل اشباع شدن (Vanishing Gradient) در تابع Sigmoid}
+	
+	وقتی $|x|$ بزرگ باشد، خروجی سیگموید به ۱ یا ۰ نزدیک شده و \textbf{مشتق آن تقریباً صفر} می‌شود:
+	\[
+	\sigma'(x) = \sigma(x)(1 - \sigma(x)) \leq 0.25
+	\]
+	در شبکه‌های عمیق، گرادیان در هر لایه در مشتق تابع فعال‌سازی ضرب می‌شود. اگر چندین لایه مشتق نزدیک به صفر داشته باشند، گرادیان در لایه‌های اولیه \textbf{ناپدید (vanish)} می‌شود و وزن‌ها به‌روزرسانی نمی‌شوند.
+	
+	\textbf{آیا جایگزینی با Tanh این مشکل را کاملاً برطرف می‌کند؟}
+	
+	\textbf{خیر، اما به طور قابل توجهی کاهش می‌یابد.}
+	
+	مشتق \lr{tanh}:
+	\[
+	\tanh'(x) = 1 - \tanh^2(x) \leq 1
+	\]
+	حداکثر مشتق آن ۱ است (۴ برابر سیگموید). در نواحی اشباع همچنان به صفر میل می‌کند، پس مشکل کاملاً حذف نمی‌شود، اما در عمل گرادیان‌ها کمتر ناپدید می‌شوند.
+	
+	\subsection*{ج: چرا Tanh بهینه‌سازی را نسبت به Sigmoid آسان‌تر می‌کند؟}
+	
+	\begin{enumerate}
+		\item \textbf{مشتق بزرگ‌تر:} حداکثر مشتق \lr{tanh} برابر ۱ است (در مقابل ۰.۲۵ برای سیگموید) → گرادیان‌های بزرگ‌تر → همگرایی سریع‌تر.
+		
+		\item \textbf{خروجی متمرکز حول صفر (Zero-Centered):} خروجی \lr{tanh} در $[-1,1]$ و میانگین نزدیک صفر است، در حالی که سیگموید در $[0,1]$ و میانگین $\approx 0.5$. خروجی همیشه مثبت در سیگموید باعث به‌روزرسانی زیگزاگی وزن‌ها می‌شود، اما \lr{tanh} اجازه جهت‌های مختلف گرادیان را می‌دهد → بهینه‌سازی روان‌تر.
+		
+		\item \textbf{تقارن حول مبدا:} \lr{tanh} تابع فرد است $\tanh(-x) = -\tanh(x)$ → یادگیری الگوهای متقارن آسان‌تر.
+	\end{enumerate}
+	
+	\begin{table}[H]
+		\centering
+		\caption{مقایسه تابع فعال‌سازی Sigmoid و Tanh}
+		\begin{tabular}{lcc}
+			\toprule
+			ویژگی                  & Sigmoid      & Tanh         \\
+			\midrule
+			بازه خروجی             & $[0, 1]$     & $[-1, 1]$    \\
+			متمرکز حول صفر؟        & خیر          & بله          \\
+			حداکثر مشتق             & ۰.۲۵         & ۱            \\
+			شدت Vanishing Gradient  & بسیار شدید   & متوسط        \\
+			سرعت همگرایی            & کند          & سریع‌تر      \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	در نتیجه، \lr{tanh} در دهه ۲۰۱۰ جایگزین اصلی \lr{sigmoid} در لایه‌های مخفی بود، اما امروزه \lr{ReLU} و خانواده آن به دلیل عدم Galleria اشباع در ناحیه مثبت، استاندارد هستند.
+	
+\end{document}

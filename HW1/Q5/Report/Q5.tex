@@ -1,0 +1,229 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{xepersian}
+\settextfont{Amiri}
+\setlatintextfont{Times New Roman}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{array}
+\usepackage{url}
+
+\title{تکلیف اول درس شبکه‌های عصبی}
+\author{وحید ملکی \\ شماره دانشجویی: 40313004}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section*{سوال ۵}
+	
+	\subsection*{مقدمه و هدف پروژه}
+	
+	در این بخش از تکلیف، هدف تولید ۱۰۰ نمونه داده از تابع داده‌شده $F(x)$، ذخیره آن‌ها در فایل اکسل، و سپس استفاده از این داده‌ها برای بهینه‌سازی پارامترهای یک مدل پارامتریک با استفاده از ده الگوریتم بهینه‌سازی مختلف است. مدل پارامتریک برای تخمین $F(x)$ تعریف شده و بهینه‌سازی در سه حالت انجام می‌شود: بهینه‌سازی فقط پارامترهای $\alpha$، فقط پارامترهای $\theta$، و بهینه‌سازی همزمان هر دو گروه. معیار ارزیابی، خطای میانگین مربعات (\lr{MSE}) است و نتایج در جدولی خلاصه می‌شوند. در نهایت، الگوریتم‌ها مقایسه شده و بهترین روش مشخص می‌شود.
+	
+	تابع اصلی تولید داده:
+	\[
+	F(x) = 3 \log \operatorname{sig}(1.7x) + 4 \tan \operatorname{sig}(3x) + 4 \operatorname{Swish}(2.5x) + x^4 - 2x^2 + 0.1x + 1
+	\]
+	
+	مدل پارامتریک برای تخمین:
+	\[
+	\hat{F}(x) = \alpha_1 \log \operatorname{sig}(\theta_1 x) + \alpha_2 \tan \operatorname{sig}(\theta_2 x) + \alpha_3 \operatorname{Swish}(\theta_3 x) + (\alpha_4 x^2 - 1) + \alpha_5 x
+	\]
+	
+	\subsection*{روش‌شناسی}
+	
+	\subsubsection*{تولید و ذخیره داده‌ها}
+	
+	۱۰۰ نمونه داده در بازه $[-2, 2]$ از تابع $F(x)$ تولید شد. این داده‌ها شامل مقادیر $x$ و $y = F(x)$ هستند و در فایل \lr{generated\_data.xlsx} ذخیره شدند. برای تولید داده‌ها از تابع \lr{generate\_and\_save\_data} در فایل \lr{utils.py} استفاده شد که داده‌ها را به صورت تصادفی اما یکنواخت تولید می‌کند.
+	
+	نمودار داده‌های تولید شده در شکل \ref{fig:data} نشان داده شده است.
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=0.8\textwidth]{generated_data_plot.png}
+		\caption{داده‌های تولید شده از تابع اصلی $F(x)$}
+		\label{fig:data}
+	\end{figure}
+	
+	\subsubsection*{تعریف مدل و تابع هزینه}
+	
+	مدل $\hat{F}(x)$ با ۵ پارامتر $\alpha$ و ۳ پارامتر $\theta$ تعریف شد. مقدار اولیه تمام پارامترها به صورت تصادفی در بازه $[0, 1]$ انتخاب می‌شود. تابع هزینه، خطای میانگین مربعات (\lr{MSE}) است:
+	\[
+	\operatorname{MSE} = \frac{1}{n} \sum_{i=1}^n (y_i - \hat{y}_i)^2
+	\]
+	
+	گرادیان‌ها نسبت به پارامترها با استفاده از قاعده زنجیره‌ای و مشتقات تحلیلی محاسبه می‌شوند تا دقت و سرعت افزایش یابد.
+	
+	\subsubsection*{الگوریتم‌های بهینه‌سازی}
+	
+	ده الگوریتم بهینه‌سازی از پایه پیاده‌سازی شدند. در ادامه، توضیح کامل هر الگوریتم همراه با فرمول‌ها آورده شده است. تمام الگوریتم‌ها با نرخ یادگیری اولیه ۰.۰۰۵ و ۵۰۰۰ تکرار (\lr{Epochs}) اجرا شدند.
+	
+	\begin{enumerate}
+		\item \textbf{\lr{SGD} (\lr{Stochastic Gradient Descent}):}  
+		ساده‌ترین روش: وزن‌ها مستقیماً با گرادیان به‌روزرسانی می‌شوند.  
+		\[
+		w_{t+1} = w_t - \eta \nabla_w \mathcal{L}
+		\]
+		که $\eta$ نرخ یادگیری است. ساده اما ممکن است در مینیمم محلی گیر کند.
+		
+		\item \textbf{\lr{Momentum}:}  
+		مانند \lr{SGD} اما با اضافه کردن ممنتم برای عبور از مینیمم‌های محلی.  
+		\[
+		v_{t+1} = \gamma v_t - \eta \nabla_w \mathcal{L}, \quad w_{t+1} = w_t + v_{t+1}
+		\]
+		$\gamma = 0.9$ برای حفظ ممنتم.
+		
+		\item \textbf{\lr{Nesterov} (\lr{Nesterov Accelerated Gradient}):}  
+		نسخه بهبودیافته \lr{Momentum} با نگاه به جلو.  
+		\[
+		v_{t+1} = \gamma v_t - \eta \nabla_w \mathcal{L}(w_t + \gamma v_t), \quad w_{t+1} = w_t + v_{t+1}
+		\]
+		همگرایی سریع‌تر.
+		
+		\item \textbf{\lr{AdaGrad} (\lr{Adaptive Gradient}):}  
+		نرخ یادگیری برای هر پارامتر تطبیقی می‌شود.  
+		\[
+		G_{t+1} = G_t + (\nabla_w \mathcal{L})^2, \quad w_{t+1} = w_t - \frac{\eta}{\sqrt{G_{t+1} + \epsilon}} \nabla_w \mathcal{L}
+		\]
+		مناسب برای داده‌های پراکنده اما نرخ یادگیری ممکن است خیلی کوچک شود.
+		
+		\item \textbf{\lr{RMSProp} (\lr{Root Mean Square Propagation}):}  
+		بهبود \lr{AdaGrad} با میانگین متحرک.  
+		\[
+		E[g^2]_{t+1} = \beta E[g^2]_t + (1-\beta) (\nabla_w \mathcal{L})^2, \quad w_{t+1} = w_t - \frac{\eta}{\sqrt{E[g^2]_{t+1} + \epsilon}} \nabla_w \mathcal{L}
+		\]
+		$\beta = 0.999$.
+		
+		\item \textbf{\lr{AdaDelta}:}  
+		مانند \lr{RMSProp} اما بدون نیاز به نرخ یادگیری اولیه.  
+		\[
+		E[\Delta w^2]_{t+1} = \beta E[\Delta w^2]_t + (1-\beta) (\Delta w)^2
+		\]
+		نرخ یادگیری تطبیقی بر اساس تغییرات گذشته.
+		
+		\item \textbf{\lr{Adam} (\lr{Adaptive Moment Estimation}):}  
+		ترکیب \lr{Momentum} و \lr{RMSProp}.  
+		\[
+		m_{t+1} = \beta_1 m_t + (1-\beta_1) \nabla_w \mathcal{L}, \quad v_{t+1} = \beta_2 v_t + (1-\beta_2) (\nabla_w \mathcal{L})^2
+		\]
+		\[
+		w_{t+1} = w_t - \frac{\eta}{\sqrt{\hat{v}_{t+1}} + \epsilon} \hat{m}_{t+1}
+		\]
+		$\beta_1 = 0.9$, $\beta_2 = 0.999$.
+		
+		\item \textbf{\lr{AdaMax}:}  
+		نسخه \lr{Adam} با نرم بی‌نهایت.  
+		\[
+		u_{t+1} = \max(\beta_2 u_t, |\nabla_w \mathcal{L}|)
+		\]
+		
+		\item \textbf{\lr{Nadam} (\lr{Nesterov-accelerated Adaptive Moment Estimation}):}  
+		\lr{Adam} با \lr{Nesterov Momentum}.  
+		مشابه \lr{Adam} اما با نگاه به جلو.
+		
+		\item \textbf{\lr{AMSGrad}:}  
+		بهبود \lr{Adam} برای جلوگیری از همگرایی ضعیف.  
+		\[
+		\hat{v}_{t+1} = \max(\hat{v}_t, v_{t+1})
+		\]
+	\end{enumerate}
+	
+	\subsection*{پیاده‌سازی پروژه}
+	
+	پروژه به صورت ماژولار در چهار فایل پیاده‌سازی شد:
+	
+	- \lr{activations.py}: توابع فعال‌سازی و مشتقات (\lr{logsig}, \lr{tansig}, \lr{swish} و مشتقات).
+	
+	- \lr{Optimizers.py}: کلاس‌های بهینه‌ساز (هر الگوریتم در یک کلاس \lr{Stateful}).
+	
+	- \lr{utils.py}: توابع تولید داده، مدل، \lr{MSE} و محاسبه گرادیان.
+	
+	- \lr{main.ipynb}: اجرای آزمایش‌ها، ذخیره نتایج و رسم نمودارها.
+	
+	کد اصلی در \lr{main.ipynb} با ۵۰۰۰ تکرار و نرخ یادگیری $۰.۰۰۵$ اجرا شد.
+	
+	\subsection*{نتایج}
+	
+	جدول نتایج \lr{MSE}:
+	
+	\begin{table}[H]
+		\centering
+		\caption{نتایج خطای \lr{MSE} برای هر الگوریتم و حالت}
+		\label{tab:mse}
+		\begin{tabular}{lccc}
+			\toprule
+			\lr{Optimizer} & \lr{MSE (Alphas Only)} & \lr{MSE (Thetas Only)} & \lr{MSE (Both Alphas \& Thetas)} \\
+			\midrule
+			\lr{SGD} & $2.821886$ & $4.218111$ & $0.508155$ \\
+			\lr{Momentum} & $2.821888$ & $4.216349$ & $0.498051$ \\
+			\lr{Nesterov} & $2.786854$ & $4.086758$ & $0.131215$ \\
+			\lr{AdaGrad} & $119.956749$ & $146.319219$ & $83.280737$ \\
+			\lr{RMSProp} & $2.647066$ & $4.049449$ & $0.465062$ \\
+			\lr{AdaDelta} & $8.753923$ & $82.237825$ & $1.178379$ \\
+			\lr{Adam} & $2.844417$ & $5.697448$ & $0.712995$ \\
+			\lr{AdaMax} & $2.835573$ & $4.124761$ & $0.477942$ \\
+			\lr{Nadam} & $2.843917$ & $4.824294$ & $0.646712$ \\
+			\lr{AMSGrad} & $3.067494$ & $17.705722$ & $1.693381$ \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	نمودار مقایسه \lr{MSE} در شکل \ref{fig:mse_bar}.
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=0.8\textwidth]{mse_comparison.png}
+		\caption{مقایسه \lr{MSE} در حالت‌های مختلف}
+		\label{fig:mse_bar}
+	\end{figure}
+	
+	نمودار منحنی‌های خطا در حالت همزمان در شکل \ref{fig:loss_curves}.
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=0.8\textwidth]{loss_curves.png}
+		\caption{منحنی‌های خطا برای حالت همزمان}
+		\label{fig:loss_curves}
+	\end{figure}
+	
+	برازش بهترین مدل (\lr{Nesterov}) در شکل \ref{fig:best_fit}.
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=0.8\textwidth]{best_model_fit.png}
+		\caption{برازش بهترین مدل}
+		\label{fig:best_fit}
+	\end{figure}
+	
+	مقایسه سه مدل برتر در شکل \ref{fig:top3}.
+	
+	\begin{figure}[H]
+		\centering
+		 \includegraphics[width=0.8\textwidth]{top3_comparison.png}
+		\caption{مقایسه سه مدل برتر}
+		\label{fig:top3}
+	\end{figure}
+	
+	\subsection*{تحلیل و مقایسه}
+	
+	- \textbf{بهینه‌سازی همزمان بهترین است:} \lr{MSE} پایین‌تر در حالت همزمان نشان‌دهنده تعامل بین $\alpha$ و $\theta$ است.
+	
+	- \textbf{بهترین الگوریتم: \lr{Nesterov}} با \lr{MSE=0.131215} در حالت همزمان، به دلیل ممنتم نگاه به جلو، همگرایی سریع و عبور از مینیمم محلی.
+	
+	- \textbf{عملکرد ضعیف \lr{AdaGrad} و \lr{AdaDelta}:} نرخ یادگیری کوچک می‌شود و گیر می‌کنند.
+	
+	- \textbf{الگوریتم‌های تطبیقی مانند \lr{RMSProp} و \lr{AdaMax}:} خوب اما نه به اندازه \lr{Nesterov}.
+	
+	پارامترهای بهترین مدل: $\alpha_1=7.64$, $\alpha_2=4.07$, $\alpha_3=-3.81$, $\alpha_4=6.22$, $\alpha_5=8.59$, $\theta_1=1.04$, $\theta_2=2.98$, $\theta_3=2.28$.
+	
+	\subsection*{نتیجه‌گیری}
+	
+	الگوریتم‌های مبتنی بر ممنتم مانند \lr{Nesterov} بهترین عملکرد را داشتند. پیاده‌سازی از پایه نشان داد که انتخاب الگوریتم تأثیر مستقیم بر کیفیت دارد. برای مسائل مشابه، \lr{Nesterov} توصیه می‌شود.
+	
+\end{document}

@@ -42,48 +42,42 @@ class SGD(Optimizer):
 class CompetitiveLearning(Optimizer):
     """
     Unsupervised Competitive Learning (Winner-Take-All) for RBF Centers.
-    Required for Question 1 - Part B.
-    
-    Algorithm:
-    1. For each input pattern x:
-    2. Find the center c_k closest to x (Winner).
-    3. Move c_k closer to x: c_k = c_k + lr * (x - c_k)
-    4. Leave other centers unchanged.
+    Fixed: Uses index shuffling to avoid modifying the original data in-place.
     """
     def __init__(self, num_centers, input_dim, learning_rate=0.05):
         self.num_centers = num_centers
         self.input_dim = input_dim
         self.lr = learning_rate
-        # Initialize centers randomly in the input space
         self.centers = np.random.uniform(-1.5, 1.5, (num_centers, input_dim))
 
     def fit(self, data, epochs=50):
         """
         Args:
             data: Numpy array of shape (N, input_dim)
-            epochs: Number of passes over the dataset
         """
         print(f"Starting Competitive Learning for {epochs} epochs...")
+        n_samples = len(data)
+        indices = np.arange(n_samples) # Create indices [0, 1, 2, ...]
+
         for epoch in range(epochs):
-            # Shuffle data to avoid cyclic loops
-            np.random.shuffle(data)
+            # Shuffle indices instead of data to keep original X intact
+            np.random.shuffle(indices)
             
             total_shift = 0
-            for x in data:
-                x = x.reshape(1, -1)
+            for i in indices:
+                x = data[i].reshape(1, -1)
                 
-                # Compute distances to all centers
+                # Compute distances
                 distances = np.linalg.norm(x - self.centers, axis=1)
                 
-                # Identify Winner
+                # Winner
                 winner_idx = np.argmin(distances)
                 
-                # Update Winner
+                # Update
                 shift = self.lr * (x.flatten() - self.centers[winner_idx])
                 self.centers[winner_idx] += shift
                 total_shift += np.linalg.norm(shift)
             
-            # Optional: Decay learning rate
             self.lr *= 0.99
             
             if (epoch+1) % 10 == 0:
@@ -92,7 +86,6 @@ class CompetitiveLearning(Optimizer):
         return self.centers
 
     def update(self, model, x, y):
-        # Not used in the standard supervised training loop
         pass
 
 

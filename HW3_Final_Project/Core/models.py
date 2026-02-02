@@ -13,13 +13,14 @@ class Sequential:
     - Standard Backpropagation Training (SGD).
     - Extended Kalman Filter Training (EKF) for Q3.
     - Automatic state resetting for Recurrent Networks (Q2).
-    - History tracking for visualization.
+    - History tracking for visualization (Train & Validation).
     """
     def __init__(self, layers=None):
         self.layers = layers if layers else []
         self.loss_fn = None
         self.optimizer = None
-        self.history = {'loss': []}
+        # Initialize history to track both training and validation loss
+        self.history = {'loss': [], 'val_loss': []}
 
     def add(self, layer):
         """Adds a layer to the stack."""
@@ -63,13 +64,34 @@ class Sequential:
             grad = layer.backward(grad, **learning_rates)
         return grad
 
-    def fit(self, X, y, epochs=100, batch_size=1, verbose=True):
+    def _compute_val_loss(self, X_val, y_val):
+        """Helper to compute validation loss without training."""
+        if X_val is None or y_val is None:
+            return None
+        
+        # Reset states before validation to ensure clean history for recurrent nets
+        self.reset_states()
+        
+        val_loss_sum = 0.0
+        n_val = len(X_val)
+        
+        for i in range(n_val):
+            # Forward pass only
+            pred = self.forward(X_val[i])
+            loss = self.loss_fn.compute(pred, y_val[i])
+            val_loss_sum += loss
+            
+        return val_loss_sum / n_val
+
+    def fit(self, X, y, validation_data=None, epochs=100, batch_size=1, verbose=True):
         """
         Main Training Loop.
         
-        Handles two distinct training modes:
-        1. Standard SGD: Forward -> Loss -> Backward (Update inside layers).
-        2. EKF (Q3): Update via Optimizer -> Forward (Implicitly handled in EKF step).
+        Args:
+            X, y: Training data.
+            validation_data: Tuple (X_val, y_val) or None.
+            epochs: Number of training iterations.
+            verbose: Print logs.
         """
         if self.loss_fn is None or self.optimizer is None:
             raise RuntimeError("You must call .compile() before .fit()")
@@ -79,14 +101,18 @@ class Sequential:
         mode_name = "EKF" if is_ekf else "SGD"
         
         n_samples = len(X)
+        has_val = validation_data is not None
+        
         print(f"Starting Training | Mode: {mode_name} | Epochs: {epochs} | Samples: {n_samples}")
+        if has_val:
+            print(f"Validation enabled | Val Samples: {len(validation_data[0])}")
         
         start_time = time.time()
 
         for epoch in range(epochs):
             epoch_loss = 0.0
             
-            # Reset Recurrent States at the start of each epoch (for Q2 stability)
+            # Reset Recurrent States at the start of each epoch (Training)
             self.reset_states()
             
             # Create a progress bar for this epoch
@@ -95,22 +121,18 @@ class Sequential:
             else:
                 pbar = range(n_samples)
 
-            # --- Sample Loop ---
+            # --- Training Loop ---
             for i in pbar:
                 xi = X[i]
                 yi = y[i]
 
-                # --- MODE 1: Extended Kalman Filter (EKF) ---
+                # --- MODE 1: EKF ---
                 if is_ekf:
-                    # EKF Optimizer handles the entire update step (Forward & Update)
-                    # It returns the error (innovation) for logging
                     current_error = self.optimizer.update(self, xi, yi)
-                    
-                    # Compute Loss for history (Squared Error proxy)
                     loss_val = 0.5 * (current_error ** 2)
                     epoch_loss += loss_val
 
-                # --- MODE 2: Standard SGD / Backpropagation ---
+                # --- MODE 2: SGD ---
                 else:
                     # 1. Forward
                     y_pred = self.forward(xi)
@@ -119,24 +141,29 @@ class Sequential:
                     loss_val = self.loss_fn.compute(y_pred, yi)
                     epoch_loss += loss_val
                     
-                    # 3. Compute Gradient of Loss w.r.t Output
+                    # 3. Backward & Update
                     grad_loss = self.loss_fn.gradient(y_pred, yi)
-                    
-                    # 4. Backward & Update
-                    # Retrieve learning rates from SGD optimizer
                     lrs = self.optimizer.get_learning_rates()
                     self.backward(grad_loss, lrs)
 
                 # Update progress bar description
                 if verbose and isinstance(pbar, tqdm):
-                    pbar.set_postfix({'loss': f"{loss_val:.5f}"})
+                    pbar.set_postfix({'train_loss': f"{loss_val:.5f}"})
 
-            # End of Epoch
-            avg_loss = epoch_loss / n_samples
-            self.history['loss'].append(avg_loss)
+            # --- End of Epoch Calculations ---
+            avg_train_loss = epoch_loss / n_samples
+            self.history['loss'].append(avg_train_loss)
+            
+            # --- Validation Loop ---
+            val_msg = ""
+            if has_val:
+                X_val, y_val = validation_data
+                avg_val_loss = self._compute_val_loss(X_val, y_val)
+                self.history['val_loss'].append(avg_val_loss)
+                val_msg = f" | Val Loss: {avg_val_loss:.6f}"
             
             if verbose:
-                print(f"Epoch {epoch+1} finished. Avg Loss: {avg_loss:.6f}")
+                print(f"Epoch {epoch+1} finished. Train Loss: {avg_train_loss:.6f}{val_msg}")
 
         total_time = time.time() - start_time
         print(f"Training Complete. Time: {total_time:.2f}s")
@@ -161,7 +188,6 @@ class Sequential:
         
         total_params = 0
         for layer in self.layers:
-            # Try to get output shape or param count
             try:
                 params = layer.get_params().size
             except:

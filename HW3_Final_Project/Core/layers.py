@@ -180,73 +180,6 @@ class RoughDenseLayer(Layer):
         return grad_input
 
 
-class RoughGMDHLayer(Layer):
-    """Rough Polynomial Layer for Q4."""
-    def __init__(self, input_dim, alpha=0.5, beta=0.5):
-        super().__init__()
-        self.input_dim = input_dim
-        self.alpha = alpha
-        self.beta = beta
-        self.num_pairs = int(input_dim * (input_dim - 1) / 2)
-        
-        # 6 coeffs: bias, x, y, x^2, y^2, xy
-        self.W_L = np.random.uniform(-0.1, 0.1, (self.num_pairs, 6))
-        self.W_U = self.W_L + 0.05
-        
-        self.pair_indices = []
-        for i in range(input_dim):
-            for j in range(i + 1, input_dim):
-                self.pair_indices.append((i, j))
-
-    def _compute_poly_features(self, x):
-        x = x.flatten()
-        feats = np.zeros((self.num_pairs, 6))
-        for k, (i, j) in enumerate(self.pair_indices):
-            xi, xj = x[i], x[j]
-            feats[k, :] = [1.0, xi, xj, xi**2, xj**2, xi*xj]
-        return feats
-
-    def forward(self, x):
-        self.X_in = x
-        self.poly_feats = self._compute_poly_features(x)
-        
-        self.y_L = np.sum(self.W_L * self.poly_feats, axis=1).reshape(-1, 1)
-        self.y_U = np.sum(self.W_U * self.poly_feats, axis=1).reshape(-1, 1)
-        
-        return self.alpha * self.y_L + self.beta * self.y_U
-
-    def backward(self, output_gradient, **kwargs):
-        lr = kwargs.get('lr', 0.01)
-        d_y_L = output_gradient * self.alpha
-        d_y_U = output_gradient * self.beta
-        
-        grad_W_L = d_y_L * self.poly_feats
-        grad_W_U = d_y_U * self.poly_feats
-        
-        grad_input = np.zeros_like(self.X_in)
-        x_flat = self.X_in.flatten()
-        
-        for k, (i, j) in enumerate(self.pair_indices):
-            xi, xj = x_flat[i], x_flat[j]
-            
-            # dy/dxi from polynomial
-            dpoly_dxi_L = self.W_L[k, 1] + 2*self.W_L[k, 3]*xi + self.W_L[k, 5]*xj
-            dpoly_dxj_L = self.W_L[k, 2] + 2*self.W_L[k, 4]*xj + self.W_L[k, 5]*xi
-            
-            dpoly_dxi_U = self.W_U[k, 1] + 2*self.W_U[k, 3]*xi + self.W_U[k, 5]*xj
-            dpoly_dxj_U = self.W_U[k, 2] + 2*self.W_U[k, 4]*xj + self.W_U[k, 5]*xi
-            
-            grad_input[i] += d_y_L[k] * dpoly_dxi_L + d_y_U[k] * dpoly_dxi_U
-            grad_input[j] += d_y_L[k] * dpoly_dxj_L + d_y_U[k] * dpoly_dxj_U
-
-        if self.trainable:
-            self.W_L -= lr * grad_W_L
-            self.W_U -= lr * grad_W_U
-            self.W_U = np.maximum(self.W_L, self.W_U)
-            
-        return grad_input
-
-
 class RoughHybridRecurrentLayer(Layer):
     """Rough Elman-Jordan Layer (Q2-a)."""
     def __init__(self, input_dim, hidden_dim, output_dim, memory_depth=1, alpha=0.5, beta=0.5):
@@ -440,3 +373,104 @@ class SimpleElmanLayer(Layer):
             self.by -= lr * grad_by
             
         return self.Wx.T @ d_net_h
+    
+
+class RoughIntervalOutputLayer(DenseLayer):
+    def __init__(self, input_dim, output_dim):
+        super().__init__(input_dim, output_dim)
+        self.W_L = np.random.uniform(-0.5, 0.5, (output_dim, input_dim))
+        self.W_U = self.W_L + np.random.uniform(0.01, 0.2, (output_dim, input_dim))
+        self.b_L = np.zeros((output_dim, 1))
+        self.b_U = np.zeros((output_dim, 1))
+        
+    def forward(self, x):
+        self.X = x.reshape(-1, 1)
+        self.net_L = self.W_L @ self.X + self.b_L
+        self.net_U = self.W_U @ self.X + self.b_U
+        return np.concatenate([self.net_L, self.net_U], axis=0)
+
+    def backward(self, output_gradient, **kwargs):
+        lr = kwargs.get('lr', 0.01)
+        split = output_gradient.shape[0] // 2
+        d_L = output_gradient[:split]
+        d_U = output_gradient[split:]
+        
+        grad_W_L = d_L @ self.X.T
+        grad_W_U = d_U @ self.X.T
+        grad_input = self.W_L.T @ d_L + self.W_U.T @ d_U
+        
+        if self.trainable:
+            self.W_L -= lr * grad_W_L
+            self.W_U -= lr * grad_W_U
+            self.b_L -= lr * d_L
+            self.b_U -= lr * d_U
+            self.W_U = np.maximum(self.W_L, self.W_U)
+            self.b_U = np.maximum(self.b_L, self.b_U)
+        return grad_input
+
+
+class RoughGMDHLayer(Layer):
+    """Rough Polynomial Layer for Q4."""
+    def __init__(self, input_dim, alpha=0.5, beta=0.5):
+        super().__init__()
+        self.input_dim = input_dim
+        self.alpha = alpha
+        self.beta = beta
+        self.num_pairs = int(input_dim * (input_dim - 1) / 2)
+        
+        # 6 coeffs: bias, x, y, x^2, y^2, xy
+        self.W_L = np.random.uniform(-0.1, 0.1, (self.num_pairs, 6))
+        self.W_U = self.W_L + 0.05
+        
+        self.pair_indices = []
+        for i in range(input_dim):
+            for j in range(i + 1, input_dim):
+                self.pair_indices.append((i, j))
+
+    def _compute_poly_features(self, x):
+        x = x.flatten()
+        feats = np.zeros((self.num_pairs, 6))
+        for k, (i, j) in enumerate(self.pair_indices):
+            xi, xj = x[i], x[j]
+            feats[k, :] = [1.0, xi, xj, xi**2, xj**2, xi*xj]
+        return feats
+
+    def forward(self, x):
+        self.X_in = x
+        self.poly_feats = self._compute_poly_features(x)
+        
+        self.y_L = np.sum(self.W_L * self.poly_feats, axis=1).reshape(-1, 1)
+        self.y_U = np.sum(self.W_U * self.poly_feats, axis=1).reshape(-1, 1)
+        
+        return self.alpha * self.y_L + self.beta * self.y_U
+
+    def backward(self, output_gradient, **kwargs):
+        lr = kwargs.get('lr', 0.01)
+        d_y_L = output_gradient * self.alpha
+        d_y_U = output_gradient * self.beta
+        
+        grad_W_L = d_y_L * self.poly_feats
+        grad_W_U = d_y_U * self.poly_feats
+        
+        grad_input = np.zeros_like(self.X_in)
+        x_flat = self.X_in.flatten()
+        
+        for k, (i, j) in enumerate(self.pair_indices):
+            xi, xj = x_flat[i], x_flat[j]
+            
+            # dy/dxi from polynomial
+            dpoly_dxi_L = self.W_L[k, 1] + 2*self.W_L[k, 3]*xi + self.W_L[k, 5]*xj
+            dpoly_dxj_L = self.W_L[k, 2] + 2*self.W_L[k, 4]*xj + self.W_L[k, 5]*xi
+            
+            dpoly_dxi_U = self.W_U[k, 1] + 2*self.W_U[k, 3]*xi + self.W_U[k, 5]*xj
+            dpoly_dxj_U = self.W_U[k, 2] + 2*self.W_U[k, 4]*xj + self.W_U[k, 5]*xi
+            
+            grad_input[i] += d_y_L[k] * dpoly_dxi_L + d_y_U[k] * dpoly_dxi_U
+            grad_input[j] += d_y_L[k] * dpoly_dxj_L + d_y_U[k] * dpoly_dxj_U
+
+        if self.trainable:
+            self.W_L -= lr * grad_W_L
+            self.W_U -= lr * grad_W_U
+            self.W_U = np.maximum(self.W_L, self.W_U)
+            
+        return grad_input

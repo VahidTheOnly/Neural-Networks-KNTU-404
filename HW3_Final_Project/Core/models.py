@@ -83,7 +83,7 @@ class Sequential:
             
         return val_loss_sum / n_val
 
-    def fit(self, X, y, validation_data=None, epochs=100, batch_size=1, verbose=True):
+    def fit(self, X, y, validation_data=None, epochs=100, batch_size=1, verbose=True, log_freq=5):
         """
         Main Training Loop.
         
@@ -92,6 +92,7 @@ class Sequential:
             validation_data: Tuple (X_val, y_val) or None.
             epochs: Number of training iterations.
             verbose: Print logs.
+            log_freq: Frequency of printing logs (e.g., 5 means print every 5th epoch).
         """
         if self.loss_fn is None or self.optimizer is None:
             raise RuntimeError("You must call .compile() before .fit()")
@@ -112,14 +113,18 @@ class Sequential:
         for epoch in range(epochs):
             epoch_loss = 0.0
             
-            # Reset Recurrent States at the start of each epoch (Training)
+            # Reset Recurrent States at the start of each epoch
             self.reset_states()
             
-            # Create a progress bar for this epoch
-            if verbose:
+            # --- Logic to control printing frequency ---
+            # Print if: verbose is True AND (First Epoch OR Last Epoch OR Multiple of log_freq)
+            should_log = verbose and ((epoch + 1) % log_freq == 0 or epoch == 0 or (epoch + 1) == epochs)
+            
+            # Create a progress bar ONLY if we are logging this epoch
+            if should_log:
                 pbar = tqdm(range(n_samples), desc=f"Epoch {epoch+1}/{epochs}", unit="sample")
             else:
-                pbar = range(n_samples)
+                pbar = range(n_samples) # Silent iterator
 
             # --- Training Loop ---
             for i in pbar:
@@ -146,8 +151,8 @@ class Sequential:
                     lrs = self.optimizer.get_learning_rates()
                     self.backward(grad_loss, lrs)
 
-                # Update progress bar description
-                if verbose and isinstance(pbar, tqdm):
+                # Update progress bar description (only if it exists)
+                if should_log and isinstance(pbar, tqdm):
                     pbar.set_postfix({'train_loss': f"{loss_val:.5f}"})
 
             # --- End of Epoch Calculations ---
@@ -162,7 +167,8 @@ class Sequential:
                 self.history['val_loss'].append(avg_val_loss)
                 val_msg = f" | Val Loss: {avg_val_loss:.6f}"
             
-            if verbose:
+            # Print summary only if should_log is True
+            if should_log:
                 print(f"Epoch {epoch+1} finished. Train Loss: {avg_train_loss:.6f}{val_msg}")
 
         total_time = time.time() - start_time

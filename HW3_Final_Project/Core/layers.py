@@ -3,10 +3,7 @@ from Core.base import Layer
 from Core.activations import Sigmoid  # Import Sigmoid class
 
 class DenseLayer(Layer):
-    """
-    Standard Fully Connected Layer.
-    Implements: Y = WX + b
-    """
+    """Standard Fully Connected Layer."""
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.input_dim = input_dim
@@ -43,16 +40,26 @@ class DenseLayer(Layer):
         self.b = params[w_size:].reshape(self.b.shape)
 
     def compute_jacobian(self, chain_grad=None):
-        # Assumes scalar output stream for Q3 time-series
-        j_w = self.X.T 
-        j_b = np.ones((1, 1))
+        """
+        Computes Jacobian for EKF.
+        Handles vector chain_grad correctly for hidden layers using Outer Product.
+        """
+        # chain_grad shape: (1, output_dim)
+        if chain_grad is None:
+            chain_grad = np.ones((1, self.output_dim))
         
-        if chain_grad is not None:
-            scalar_grad = chain_grad.item()
-            j_w = j_w * scalar_grad
-            j_b = j_b * scalar_grad
-            
-        return np.hstack([j_w, j_b])
+        # Ensure chain_grad is (1, output_dim)
+        chain_grad = chain_grad.reshape(1, -1)
+
+        # Jacobian w.r.t Weights W:
+        # Matrix Operation: chain_grad.T (out, 1) @ X.T (1, in) -> (out, in)
+        j_w = chain_grad.T @ self.X.T
+        
+        # Jacobian w.r.t Bias b:
+        j_b = chain_grad.flatten()
+        
+        # Flatten everything into a single row vector (1, n_params)
+        return np.hstack([j_w.ravel(), j_b]).reshape(1, -1)
 
 
 class RoughRBFLayer(Layer):

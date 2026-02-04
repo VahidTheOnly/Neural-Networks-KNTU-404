@@ -156,36 +156,17 @@ class DataHandler:
     # --- Q3 Part E: Mackey-Glass Differential Equation ---
 
     @staticmethod
-    def generate_mackey_glass(n_samples=1000, tau=17, delta_t=0.1):
-        """
-        Generates chaotic time series using Mackey-Glass equation.
-        dx/dt = beta * x(t-tau) / (1 + x(t-tau)^n) - gamma * x(t)
+    def generate_mackey_glass(n_steps, tau, x0, delta_t=0.1, beta=0.2, gamma=0.1, n=10):
+        """Generates Mackey-Glass time series using Euler method."""
+        history = int(tau / delta_t)
+        # Initialize series with initial value x0
+        x = np.full(n_steps + history, x0)
         
-        Standard params: beta=0.2, gamma=0.1, n=10, tau=17
-        """
-        beta = 0.2
-        gamma = 0.1
-        n = 10
-        
-        # Initialization history (needs to be at least tau long)
-        history_len = int(tau / delta_t) + 1
-        x = [1.2] * history_len # Initial condition
-        
-        generated_data = []
-        
-        for i in range(n_samples):
-            current_x = x[-1]
-            delayed_x = x[-history_len] # x(t - tau)
+        for i in range(history, n_steps + history - 1):
+            # x(t - tau)
+            x_tau = x[i - history]
+            # Mackey-Glass formula
+            dxdt = (beta * x_tau) / (1 + x_tau**n) - gamma * x[i]
+            x[i+1] = x[i] + dxdt * delta_t
             
-            # Euler Integration step
-            dx_dt = (beta * delayed_x) / (1 + delayed_x**n) - (gamma * current_x)
-            next_x = current_x + dx_dt * delta_t
-            
-            x.append(next_x)
-            generated_data.append(next_x)
-            
-            # Keep buffer size manageable? 
-            # Actually we just need to append and index backwards. 
-            # For memory efficiency in huge loops we might pop, but here it's fine.
-            
-        return np.array(generated_data)
+        return x[history:]

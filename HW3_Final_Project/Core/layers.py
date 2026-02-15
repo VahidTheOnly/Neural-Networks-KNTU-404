@@ -1,9 +1,8 @@
 import numpy as np
 from Core.base import Layer
-from Core.activations import Sigmoid  # Import Sigmoid class
+from Core.activations import Sigmoid  
 
 class DenseLayer(Layer):
-    """Standard Fully Connected Layer."""
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.input_dim = input_dim
@@ -30,7 +29,6 @@ class DenseLayer(Layer):
             self.b -= lr * grad_b
         return grad_input
 
-    # --- EKF Methods ---
     def get_params(self):
         return np.concatenate([self.W.ravel(), self.b.ravel()]).reshape(-1, 1)
 
@@ -40,37 +38,25 @@ class DenseLayer(Layer):
         self.b = params[w_size:].reshape(self.b.shape)
 
     def compute_jacobian(self, chain_grad=None):
-        """
-        Computes Jacobian for EKF.
-        Handles vector chain_grad correctly for hidden layers using Outer Product.
-        """
-        # chain_grad shape: (1, output_dim)
         if chain_grad is None:
             chain_grad = np.ones((1, self.output_dim))
         
-        # Ensure chain_grad is (1, output_dim)
         chain_grad = chain_grad.reshape(1, -1)
-
-        # Jacobian w.r.t Weights W:
-        # Matrix Operation: chain_grad.T (out, 1) @ X.T (1, in) -> (out, in)
+        
         j_w = chain_grad.T @ self.X.T
         
-        # Jacobian w.r.t Bias b:
         j_b = chain_grad.flatten()
         
-        # Flatten everything into a single row vector (1, n_params)
         return np.hstack([j_w.ravel(), j_b]).reshape(1, -1)
 
 
 class RoughRBFLayer(Layer):
-    """Rough RBF Layer (Q1 & Q4). Outputs [phi_L; phi_U]."""
     
     def __init__(self, input_dim, num_kernels):
         super().__init__()
         self.input_dim = input_dim
         self.num_kernels = num_kernels
         
-        # Initial Rough Centers & Sigmas
         self.c_L = np.random.uniform(-1, 1, (num_kernels, input_dim))
         self.c_U = self.c_L + np.random.uniform(0.01, 0.2, (num_kernels, input_dim))
         
@@ -80,10 +66,8 @@ class RoughRBFLayer(Layer):
         self.X = None
 
     def init_centers(self, centers):
-        """Used after Unsupervised Learning (Q1-Part B)"""
         self.c_L = centers
-        self.c_U = centers + 0.05 # Small margin
-        # Reset sigmas usually
+        self.c_U = centers + 0.05 
         self.s_L = np.ones_like(self.s_L)
         self.s_U = self.s_L + 0.1
 
@@ -105,7 +89,6 @@ class RoughRBFLayer(Layer):
         d_phi_L = output_gradient[:self.num_kernels]
         d_phi_U = output_gradient[self.num_kernels:]
         
-        # Derivatives
         common_L = d_phi_L * self.phi_L / (self.s_L**2)
         grad_c_L = common_L * (self.X - self.c_L)
         grad_s_L = d_phi_L * self.phi_L * (self.dist_sq_L / (self.s_L**3))
@@ -114,7 +97,6 @@ class RoughRBFLayer(Layer):
         grad_c_U = common_U * (self.X - self.c_U)
         grad_s_U = d_phi_U * self.phi_U * (self.dist_sq_U / (self.s_U**3))
         
-        # Gradient w.r.t Input (For Q4: RBF -> GMDH)
         grad_input_L = np.sum(-common_L * (self.X - self.c_L), axis=0).reshape(-1, 1)
         grad_input_U = np.sum(-common_U * (self.X - self.c_U), axis=0).reshape(-1, 1)
         grad_input = grad_input_L + grad_input_U
@@ -125,7 +107,6 @@ class RoughRBFLayer(Layer):
             self.s_L -= lr_s * grad_s_L
             self.s_U -= lr_s * grad_s_U
             
-            # Constraints
             self.c_U = np.maximum(self.c_L, self.c_U)
             self.s_L = np.maximum(self.s_L, 1e-4)
             self.s_U = np.maximum(self.s_L, self.s_U)
@@ -134,7 +115,6 @@ class RoughRBFLayer(Layer):
 
 
 class RoughDenseLayer(Layer):
-    """Combines Rough RBF outputs into a crisp value."""
     def __init__(self, input_dim, output_dim, alpha=0.5, beta=0.5):
         super().__init__()
         self.input_dim = input_dim
@@ -181,7 +161,6 @@ class RoughDenseLayer(Layer):
 
 
 class RoughHybridRecurrentLayer(Layer):
-    """Rough Elman-Jordan Layer (Q2-a)."""
     def __init__(self, input_dim, hidden_dim, output_dim, memory_depth=1, alpha=0.5, beta=0.5):
         super().__init__()
         self.input_dim = input_dim
@@ -191,10 +170,8 @@ class RoughHybridRecurrentLayer(Layer):
         self.alpha = alpha
         self.beta = beta
         
-        # Use Activation Class
         self.activation_fn = Sigmoid()
 
-        # Weights ... (same initialization as before)
         self.Wx_L = np.random.uniform(-0.5, 0.5, (hidden_dim, input_dim))
         self.Wx_U = self.Wx_L + 0.1
         self.Wy_L = np.random.uniform(-0.5, 0.5, (output_dim, hidden_dim))
@@ -232,7 +209,6 @@ class RoughHybridRecurrentLayer(Layer):
             net_h_L += self.Wc1_L[k] @ self.h_history_L[k] + self.Wc2_L[k] @ self.y_history_L[k]
             net_h_U += self.Wc1_U[k] @ self.h_history_U[k] + self.Wc2_U[k] @ self.y_history_U[k]
             
-        # Use Class Activation
         self.h_L = self.activation_fn.forward(net_h_L)
         self.h_U = self.activation_fn.forward(net_h_U)
         
@@ -254,12 +230,7 @@ class RoughHybridRecurrentLayer(Layer):
         dy_L = output_gradient * self.alpha
         dy_U = output_gradient * self.beta
         
-        # Use Activation Backward manually since we have split flows
-        # d_net = dy * f'(net)
-        d_net_y_L = self.activation_fn.backward(dy_L) # This assumes activation.out is set correctly? 
-        # WARNING: Calling backward on the same activation instance twice (for L and U) 
-        # overwrites 'self.out'. We must rely on 'forward' setting it, or use manual derivative.
-        # Safer approach for Hybrid L/U: Manual derivative using stored y_L/y_U
+        d_net_y_L = self.activation_fn.backward(dy_L) 
         
         d_net_y_L = dy_L * (self.y_L * (1 - self.y_L))
         d_net_y_U = dy_U * (self.y_U * (1 - self.y_U))
@@ -292,7 +263,7 @@ class RoughHybridRecurrentLayer(Layer):
             self.Wx_U -= lr * grad_Wx_U
             self.Wy_L -= lr * grad_Wy_L
             self.Wy_U -= lr * grad_Wy_U
-            self.bh_L -= lr * d_net_h_L # Corrected gradient for bias
+            self.bh_L -= lr * d_net_h_L 
             self.bh_U -= lr * d_net_h_U
             self.by_L -= lr * d_net_y_L
             self.by_U -= lr * d_net_y_U
@@ -311,12 +282,6 @@ class RoughHybridRecurrentLayer(Layer):
 
 
 class SimpleElmanLayer(Layer):
-    """
-    Standard Elman Layer (Not Rough).
-    Required for Q2-Part B Comparison.
-    h(t) = Sigmoid(Wx * x + Wc * h(t-1) + b)
-    y(t) = Sigmoid(Wy * h(t) + c)
-    """
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
         self.input_dim = input_dim
@@ -339,12 +304,11 @@ class SimpleElmanLayer(Layer):
         self.X = x.reshape(-1, 1)
         self.h_prev_cached = self.h_prev.copy()
         
-        # Elman: Context comes from previous Hidden
         net_h = self.Wx @ self.X + self.Wc @ self.h_prev + self.bh
-        self.h = 1 / (1 + np.exp(-net_h)) # Sigmoid
+        self.h = 1 / (1 + np.exp(-net_h)) 
         
         net_y = self.Wy @ self.h + self.by
-        self.y = 1 / (1 + np.exp(-net_y)) # Sigmoid
+        self.y = 1 / (1 + np.exp(-net_y))
         
         self.h_prev = self.h
         return self.y
@@ -352,12 +316,10 @@ class SimpleElmanLayer(Layer):
     def backward(self, output_gradient, **kwargs):
         lr = kwargs.get('lr', 0.01)
         
-        # Output grad
         d_net_y = output_gradient * (self.y * (1 - self.y))
         grad_Wy = d_net_y @ self.h.T
         grad_by = d_net_y
         
-        # Hidden grad
         dh = self.Wy.T @ d_net_y
         d_net_h = dh * (self.h * (1 - self.h))
         
@@ -410,7 +372,6 @@ class RoughIntervalOutputLayer(DenseLayer):
 
 
 class RoughGMDHLayer(Layer):
-    """Rough Polynomial Layer for Q4."""
     def __init__(self, input_dim, alpha=0.5, beta=0.5):
         super().__init__()
         self.input_dim = input_dim
@@ -418,7 +379,6 @@ class RoughGMDHLayer(Layer):
         self.beta = beta
         self.num_pairs = int(input_dim * (input_dim - 1) / 2)
         
-        # 6 coeffs: bias, x, y, x^2, y^2, xy
         self.W_L = np.random.uniform(-0.1, 0.1, (self.num_pairs, 6))
         self.W_U = self.W_L + 0.05
         
@@ -458,7 +418,6 @@ class RoughGMDHLayer(Layer):
         for k, (i, j) in enumerate(self.pair_indices):
             xi, xj = x_flat[i], x_flat[j]
             
-            # dy/dxi from polynomial
             dpoly_dxi_L = self.W_L[k, 1] + 2*self.W_L[k, 3]*xi + self.W_L[k, 5]*xj
             dpoly_dxj_L = self.W_L[k, 2] + 2*self.W_L[k, 4]*xj + self.W_L[k, 5]*xi
             

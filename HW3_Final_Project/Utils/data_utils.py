@@ -3,24 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 class DataHandler:
-    """
-    Utility class for data loading, preprocessing, and generation.
-    Handles requirements for all HW3 questions.
-    """
 
     @staticmethod
     def load_data(filepath, header=None):
-        """
-        Loads data from Excel files.
-        Args:
-            filepath: Path to .xlsx file.
-            header: Row number to use as header (None for no header).
-        Returns:
-            np.array: Flattened numpy array of data.
-        """
         try:
             df = pd.read_excel(filepath, header=header)
-            # Assuming data is in the first column or is a single series
             data = df.values.flatten()
             return data.astype(np.float64)
         except Exception as e:
@@ -29,15 +16,9 @@ class DataHandler:
 
     @staticmethod
     def normalize_data(data):
-        """
-        Min-Max Normalization to [0, 1].
-        Returns:
-            normalized_data: scaled data.
-            scaler_params: (min_val, max_val) for denormalization.
-        """
+        
         min_val = np.min(data)
         max_val = np.max(data)
-        # Avoid division by zero
         if max_val - min_val == 0:
             return data, (min_val, max_val)
             
@@ -46,33 +27,16 @@ class DataHandler:
 
     @staticmethod
     def denormalize_data(data, scaler_params):
-        """Reverts data to original scale."""
         min_val, max_val = scaler_params
         return data * (max_val - min_val) + min_val
 
     @staticmethod
     def create_sequences(data, input_steps=5, prediction_horizon=3):
-        """
-        Creates time-series windows (Sliding Window).
-        
-        Args:
-            data: 1D numpy array.
-            input_steps: Number of past steps to use as input (default 5).
-            prediction_horizon: Which future step to predict (default 3).
-                                1 means predict t+1, 3 means predict t+3.
-        
-        Returns:
-            X: Input matrix (N, input_steps)
-            y: Target vector (N, 1)
-        """
         X, y = [], []
-        # We need enough data for input + horizon
-        # Indices: [0, 1, 2, 3, 4] -> predict index [4 + 3] = 7
         total_window = input_steps + prediction_horizon
         
         for i in range(len(data) - total_window + 1):
             window = data[i : i + input_steps]
-            # Target is the step at 'prediction_horizon' steps after the window
             target_idx = i + input_steps + prediction_horizon - 1
             target = data[target_idx]
             
@@ -83,11 +47,6 @@ class DataHandler:
 
     @staticmethod
     def train_test_split(X, y, train_ratio=0.7, shuffle=False):
-        """
-        Splits data into training and testing sets.
-        For Time Series (Q1, Q2, Q4), shuffle MUST be False.
-        For Classification (Q1-Part B), shuffle CAN be True.
-        """
         num_samples = len(X)
         indices = np.arange(num_samples)
         
@@ -105,28 +64,14 @@ class DataHandler:
 
     @staticmethod
     def add_noise(data, noise_level_percent):
-        """
-        Adds Additive Gaussian Noise (Q3 - Part C).
-        
-        Args:
-            data: Input signal.
-            noise_level_percent: Percentage of signal amplitude (e.g., 0.1, 0.5, 1.0).
-        """
         amplitude = np.max(data) - np.min(data)
         std_dev = amplitude * noise_level_percent
         noise = np.random.normal(0, std_dev, data.shape)
         return data + noise
 
-    # --- Q1 Part B: Synthetic Classification Data ---
     
     @staticmethod
     def generate_classification_dataset():
-        """
-        Generates the Red/Blue class dataset specified in Question 1 Part B.
-        Returns:
-            X: (N, 2) coordinates
-            y: (N, 1) labels (0 for Red, 1 for Blue)
-        """
         np.random.seed(42)
 
         def generate_class(centers, n_per_center, std):
@@ -135,37 +80,29 @@ class DataHandler:
                 X_local.append(np.random.randn(n_per_center, 2) * std + c)
             return np.vstack(X_local)
 
-        # Red Class Config
         red_centers = [(-0.8, 0.6), (-0.4, -0.3), (-0.5, -1.2), 
                        (0.4, 0.7), (0.6, -0.2), (1.0, -1.0)]
         X_red = generate_class(centers=red_centers, n_per_center=100, std=0.25)
-        y_red = np.zeros((X_red.shape[0], 1)) # Label 0
+        y_red = np.zeros((X_red.shape[0], 1)) 
 
-        # Blue Class Config
         blue_centers = [(-1.5, 1.1), (-0.7, 1.4), (0.2, 1.3), (1.0, 1.2), 
                         (1.6, 0.7), (1.5, -1.2), (0.3, -1.0), (-0.8, -0.9), (-1.5, -0.2)]
         X_blue = generate_class(centers=blue_centers, n_per_center=100, std=0.22)
-        y_blue = np.ones((X_blue.shape[0], 1)) # Label 1
+        y_blue = np.ones((X_blue.shape[0], 1)) 
 
-        # Combine
         X = np.vstack([X_red, X_blue])
         y = np.vstack([y_red, y_blue])
         
         return X, y
 
-    # --- Q3 Part E: Mackey-Glass Differential Equation ---
 
     @staticmethod
     def generate_mackey_glass(n_steps, tau, x0, delta_t=0.1, beta=0.2, gamma=0.1, n=10):
-        """Generates Mackey-Glass time series using Euler method."""
         history = int(tau / delta_t)
-        # Initialize series with initial value x0
         x = np.full(n_steps + history, x0)
         
         for i in range(history, n_steps + history - 1):
-            # x(t - tau)
             x_tau = x[i - history]
-            # Mackey-Glass formula
             dxdt = (beta * x_tau) / (1 + x_tau**n) - gamma * x[i]
             x[i+1] = x[i] + dxdt * delta_t
             

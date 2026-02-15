@@ -50,9 +50,7 @@ class CompetitiveLearning(Optimizer):
     def update(self, model, x, y):
         pass
 
-class EKFOptimizer(Optimizer):
-    """Extended Kalman Filter (EKF) Optimizer."""
-    
+class EKFOptimizer(Optimizer):    
     def __init__(self, layers, P_init=100.0, Q_val=1e-4, R_val=0.1):
         self.layers = layers
         self.R = np.array([[R_val]])
@@ -82,30 +80,22 @@ class EKFOptimizer(Optimizer):
                 start_idx += n_params
 
     def update(self, model, x, y):
-        # 1. Forward
         y_pred = model.forward(x)
-        error = y - y_pred # (1, 1) assuming scalar output
+        error = y - y_pred 
         
-        # 2. Compute Global Jacobian H
         H_parts = []
         
-        # Initial chain gradient: d_error / d_output = 1
         chain_grad = np.ones((1, 1))
         
         for layer in reversed(self.layers):
             if layer.get_params().size > 0:
-                # Compute Jacobian for this layer
                 h_layer = layer.compute_jacobian(chain_grad)
                 H_parts.append(h_layer)
             
-            # Update chain gradient for next layer
             if hasattr(layer, 'get_input_derivative_for_ekf'):
                 local_grad = layer.get_input_derivative_for_ekf()
-                # Chain rule for activation layer (element-wise)
                 chain_grad = chain_grad * local_grad 
             elif hasattr(layer, 'W'):
-                # Chain rule for Dense Layer (matrix multiplication)
-                # chain_grad (1, out) @ W (out, in) -> (1, in)
                 chain_grad = chain_grad @ layer.W
             
         H = np.hstack(H_parts[::-1]) 
